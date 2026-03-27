@@ -1,0 +1,38 @@
+# Clean prompt — robbyrussell spirit + cmd_duration
+# Palette: Catppuccin Mocha (cool blues/teals — distinct from mac's warm tones)
+
+format = """$character$directory$git_branch$git_status"""
+right_format = "$cmd_duration"
+
+[character]
+success_symbol = "[➜](#89dceb)"
+error_symbol = "[➜](#f38ba8)"
+
+[directory]
+truncation_length = 2
+style = "#b4befe"
+
+[git_branch]
+format = "[$branch]($style) "
+style = "#94e2d5"
+
+[git_status]
+format = "([$all_status$ahead_behind]($style) )"
+style = "#a6adc8"
+modified = "!"
+untracked = "?"
+ahead = "⇡"
+behind = "⇣"
+staged = "+"
+
+[cmd_duration]
+min_time = 2_000
+format = "[$duration]($style)"
+style = "#6c7086"
+
+[nodejs]
+disabled = true
+[package]
+disabled = true
+[python]
+disabled = true

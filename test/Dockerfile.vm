@@ -1,0 +1,38 @@
+FROM ubuntu:22.04
+
+# Minimal deps matching the Oracle VM environment
+RUN apt-get update -qq && apt-get install -y -qq \
+    zsh git curl sudo \
+    && rm -rf /var/lib/apt/lists/*
+
+# Non-root user with sudo
+RUN useradd -m -s /bin/zsh testuser \
+    && echo "testuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+USER testuser
+WORKDIR /home/testuser
+ENV HOME=/home/testuser
+ENV PATH="/home/testuser/.local/bin:$PATH"
+
+# Stub tools that install.sh and zshrc reference
+RUN mkdir -p ~/.local/bin ~/.config ~/.local/share/zsh/plugins/zsh-autosuggestions \
+    ~/.local/share/zsh/plugins/zsh-syntax-highlighting \
+    && touch ~/.local/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh \
+    && touch ~/.local/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+
+# bat stub
+RUN printf '#!/bin/sh\ncase "$1" in --config-dir) echo /home/testuser/.config/bat;; cache) true;; esac\n' \
+    > ~/.local/bin/bat && chmod +x ~/.local/bin/bat
+
+# zoxide stub
+RUN printf '#!/bin/sh\necho ""\n' > ~/.local/bin/zoxide && chmod +x ~/.local/bin/zoxide
+
+# starship stub
+RUN printf '#!/bin/sh\necho ""\n' > ~/.local/bin/starship && chmod +x ~/.local/bin/starship
+
+# Simulate a valuesync_os repo at ~/work/valuesync_os
+RUN mkdir -p ~/work/valuesync_os && cd ~/work/valuesync_os && git init -q \
+    && git config user.email "test@test" && git config user.name "test" \
+    && touch README.md && git add . && git commit -qm "init"
+
+COPY --chown=testuser:testuser . /home/testuser/dotfiles

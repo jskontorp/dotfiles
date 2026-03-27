@@ -1,0 +1,12 @@
+# Theme — Catppuccin Macchiato for syntax colours
+theme = Catppuccin Macchiato
+
+# Darker background so local Mac terminal is instantly recognisable
+# (Macchiato default is #24273a — this is much darker but not pure black)
+background = #181825
+
+# Slight transparency to reinforce the dark tint
+background-opacity = 0.985
+
+# New tabs inherit the working directory of the current tab
+window-inherit-working-directory = true

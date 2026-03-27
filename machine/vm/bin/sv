@@ -1,0 +1,481 @@
+#!/usr/bin/env zsh
+# sv — Session manager for pi agent ticket work (v3).
+#
+# Manages tmux windows (inside a single "sv" session) and git worktrees
+# for valuesync_os. Called directly on the VM or over SSH from the Mac proxy.
+#
+# Dev server: pi starts it via the solve-ticket skill (Phase 3).
+# sv never starts a dev server — on resume you get a shell in the worktree.
+
+# Resolve the main valuesync_os repo root. Works from the repo itself,
+# any subdirectory, or from inside a worktree.
+sv_resolve_repo() {
+  local r=$(git rev-parse --git-common-dir 2>/dev/null)
+  if [[ "$r" == ".git" ]]; then
+    r=$(pwd)
+  elif [[ -n "$r" ]]; then
+    r="${r%/.git}"
+  fi
+  [[ -n "$r" ]] && r=$(cd "$r" && pwd)
+  [[ -n "$r" && "$(basename "$r")" == "valuesync_os" ]] && echo "$r"
+}
+
+# Shared between Mac proxy and VM — the tmux session name is a contract
+# between both sides. Changing it requires updating both.
+SV_SESSION="sv"
+
+# --- Mac proxy: forward to VM over SSH ---
+
+if [[ "$(uname)" == "Darwin" ]]; then
+  VM_HOST="${SV_VM_HOST:-oracle}"
+  VM_REPO='~/work/valuesync_os'
+  VM_SV='~/.local/bin/sv'
+
+  _sv_proxy() {
+    local needs_attach=true
+    local destructive=false has_yes=false
+
+    for arg in "$@"; do
+      case "$arg" in
+        --list|-l|--shelve|--close|--help|-h|--no-attach) needs_attach=false ;;
+      esac
+      case "$arg" in
+        --shelve|--close) destructive=true ;;
+        --yes|-y) has_yes=true ;;
+      esac
+    done
+
+    # Confirm destructive commands locally before forwarding to VM
+    if $destructive && ! $has_yes; then
+      if [[ ! -t 0 ]]; then
+        echo "Cannot confirm: not a terminal." >&2
+        return 1
+      fi
+      local ticket_arg="" action=""
+      for arg in "$@"; do
+        case "$arg" in
+          --shelve) action="Shelve" ;;
+          --close)  action="Close" ;;
+          --*) ;;
+          *)   [[ -z "$ticket_arg" ]] && ticket_arg="$arg" ;;
+        esac
+      done
+      local upper="${ticket_arg:u}"
+      [[ "$upper" =~ ^[0-9]+$ ]] && upper="TECH-$upper"
+      local detail="This will tear down the window and worktree."
+      [[ "$action" == "Close" ]] && detail="This will delete the branch, PR, and all local state."
+      printf "%s %s? %s [y/N] " "$action" "$upper" "$detail"
+      local answer
+      read -r answer
+      if [[ ! "$answer" =~ ^[Yy]$ ]]; then
+        echo "Aborted." >&2
+        return 1
+      fi
+    fi
+
+    # Phase 1: setup (always --no-attach on remote, no TTY needed)
+    local remote_cmd="cd $(printf '%q' "$VM_REPO") && $VM_SV --no-attach"
+    for arg in "$@"; do
+      [[ "$arg" == "--no-attach" ]] && continue
+      remote_cmd+=" $(printf '%q' "$arg")"
+    done
+    # Skip remote confirmation — already confirmed locally
+    $destructive && ! $has_yes && remote_cmd+=" --yes"
+
+    ssh "$VM_HOST" "$remote_cmd"
+    local rc=$?
+    if [[ $rc -ne 0 ]]; then
+      [[ $rc -eq 255 ]] && echo "Failed to connect to VM ($VM_HOST)" >&2
+      return $rc
+    fi
+
+    # Phase 2: interactive attach
+    if $needs_attach; then
+      if ! ssh -t "$VM_HOST" "tmux attach -t '$SV_SESSION'"; then
+        echo "Remote session is running. Reconnect with: ssh -t $VM_HOST 'tmux attach -t $SV_SESSION'" >&2
+        return 1
+      fi
+    fi
+  }
+
+  _sv_proxy "$@"
+  exit $?
+fi
+
+REPO=$(sv_resolve_repo)
+
+if [[ -z "$REPO" ]]; then
+  echo "sv must be run from within the valuesync_os repository" >&2
+  exit 1
+fi
+
+WT_BASE="${REPO}_worktrees"
+
+cd "$REPO"
+
+# --- Helpers ---
+
+confirm() {
+  local prompt="$1"
+  if [[ ! -t 0 ]]; then
+    echo "Cannot confirm: not a terminal. Pass --yes to skip." >&2
+    return 1
+  fi
+  printf "%s [y/N] " "$prompt"
+  local answer
+  read -r answer
+  [[ "$answer" =~ ^[Yy]$ ]]
+}
+
+normalize() {
+  local upper="${1:u}"
+  if [[ "$upper" =~ ^[0-9]+$ ]]; then
+    echo "TECH-$upper"
+  elif [[ "$upper" =~ ^TECH-[0-9]+$ ]]; then
+    echo "$upper"
+  else
+    echo "Invalid ticket: $1 (expected 123 or TECH-123)" >&2
+    return 1
+  fi
+}
+
+wt_path() { echo "$WT_BASE/$1"; }
+
+ensure_sv_session() {
+  if ! tmux has-session -t "$SV_SESSION" 2>/dev/null; then
+    tmux new-session -d -s "$SV_SESSION" -n "home" -c "$REPO"
+  fi
+}
+
+has_window() {
+  tmux list-windows -t "$SV_SESSION" -F '#W' 2>/dev/null | grep -qx "$1"
+}
+
+# Remove a session from tmux-resurrect's saved state so continuum
+# doesn't auto-restore it on next server start.
+scrub_resurrect_session() {
+  local session="$1"
+  local resurrect_dir="${XDG_DATA_HOME:-$HOME/.local/share}/tmux/resurrect"
+  local last="$resurrect_dir/last"
+  [[ -L "$last" ]] || return 0
+  local file=$(readlink "$last")
+  [[ -f "$resurrect_dir/$file" ]] || return 0
+  local tmp="$resurrect_dir/$file.tmp"
+  grep -v $'\t'"${session}"$'\t' "$resurrect_dir/$file" > "$tmp" 2>/dev/null || true
+  mv "$tmp" "$resurrect_dir/$file"
+}
+
+# Remove a window from the sv session in tmux-resurrect's saved state.
+# Resurrect format: type\tsession\twindow_index\twindow_name\t...
+scrub_resurrect_window() {
+  local window="$1"
+  local resurrect_dir="${XDG_DATA_HOME:-$HOME/.local/share}/tmux/resurrect"
+  local last="$resurrect_dir/last"
+  [[ -L "$last" ]] || return 0
+  local file=$(readlink "$last")
+  [[ -f "$resurrect_dir/$file" ]] || return 0
+  local tmp="$resurrect_dir/$file.tmp"
+  grep -v $'\t'"${SV_SESSION}"$'\t'"[0-9][0-9]*"$'\t'"${window}"$'\t' "$resurrect_dir/$file" > "$tmp" 2>/dev/null || true
+  mv "$tmp" "$resurrect_dir/$file"
+}
+
+is_alive() {
+  local target="$SV_SESSION:$1"
+  local cmd=$(tmux list-panes -t "$target" -F '#{pane_current_command}' 2>/dev/null | head -1)
+  local dead=$(tmux list-panes -t "$target" -F '#{pane_dead}' 2>/dev/null | head -1)
+  [[ "$dead" != "1" && "$cmd" != "zsh" && "$cmd" != "bash" ]]
+}
+
+attach() {
+  local lower="$1" msg="$2" skip="${3:-false}"
+  echo "$msg (ctrl-b d to detach)"
+  [[ "$skip" == "true" ]] && return
+
+  if [[ ! -t 0 ]]; then
+    echo "Cannot attach: not a terminal (use ssh -t for interactive access)" >&2
+    return 1
+  fi
+
+  # Select the ticket window (if given), otherwise just attach to sv
+  [[ -n "$lower" ]] && tmux select-window -t "$SV_SESSION:$lower" 2>/dev/null
+
+  if [[ -n "${TMUX:-}" ]]; then
+    tmux switch-client -t "$SV_SESSION"
+  else
+    tmux attach -t "$SV_SESSION"
+  fi
+}
+
+ensure_worktree() {
+  local lower="$1" wt="$2"
+
+  [[ -d "$wt" ]] && git -C "$wt" rev-parse --git-dir &>/dev/null && return 0
+
+  git show-ref -q "refs/heads/$lower" 2>/dev/null || return 1
+
+  git worktree prune 2>/dev/null
+  [[ -d "$wt" ]] && rm -rf "$wt"
+
+  mkdir -p "$(dirname "$wt")"
+  git worktree add "$wt" "$lower" || { echo "Failed to create worktree" >&2; return 1; }
+  [[ -f "$REPO/.env.local" && ! -e "$wt/.env.local" ]] && ln -s "$REPO/.env.local" "$wt/.env.local"
+  if [[ -f "$wt/package.json" && ! -d "$wt/node_modules" ]]; then
+    (cd "$wt" && pnpm install) || echo "⚠ pnpm install failed in $wt — run it manually" >&2
+  fi
+}
+
+# --- Commands ---
+
+cmd_list() {
+  local -A tickets
+
+  # From sv session windows
+  local w
+  for w in $(tmux list-windows -t "$SV_SESSION" -F '#W' 2>/dev/null | grep -E '^tech-[0-9]+$'); do
+    tickets[$w]=1
+  done
+
+  # From dev sessions (still separate tmux sessions)
+  local s
+  for s in $(tmux list-sessions -F '#S' 2>/dev/null | grep -E '^tech-[0-9]+-dev$'); do
+    tickets[${s%-dev}]=1
+  done
+
+  if [[ -d "$WT_BASE" ]]; then
+    for d in "$WT_BASE"/tech-*(N); do
+      [[ -d "$d" ]] && tickets[$(basename "$d")]=1
+    done
+  fi
+
+  local b
+  for b in $(git branch --format='%(refname:short)' 2>/dev/null | grep -E '^tech-[0-9]+$'); do
+    [[ -n "$b" ]] && tickets[$b]=1
+  done
+
+  if [[ ${#tickets} -eq 0 ]]; then
+    echo "No solve tickets found."
+    return
+  fi
+
+  echo ""
+  for t in ${(ko)tickets}; do
+    local upper="${t:u}" parts=() dot="○"
+
+    has_window "$t"                    && { parts+=("agent"); dot="●"; }
+    tmux has-session -t "${t}-dev" 2>/dev/null && { parts+=("dev");   dot="●"; }
+    [[ -d "$WT_BASE/$t" ]]            && { parts+=("worktree"); dot="●"; }
+    [[ ${#parts} -eq 0 ]]             && parts+=("shelved")
+
+    local branch_info=""
+    if git show-ref -q "refs/heads/$t" 2>/dev/null; then
+      local ahead=$(git rev-list --count "origin/main..$t" 2>/dev/null)
+      local behind=$(git rev-list --count "$t..origin/main" 2>/dev/null)
+      [[ -n "$ahead" && "$ahead" -gt 0 ]] && branch_info="+${ahead}"
+      [[ -n "$behind" && "$behind" -gt 0 ]] && branch_info="${branch_info:+$branch_info }−${behind}"
+    fi
+
+    printf "  %s %-10s %-24s %s\n" "$dot" "$upper" "${(j:, :)parts}" "$branch_info"
+  done
+  echo ""
+}
+
+# Tear down window + worktree. Pass "quiet" as $3 to suppress the summary
+# (used by cmd_remove which prints its own).
+cmd_shelve() {
+  local lower="$1" upper="$2" quiet="${3:-false}"
+  local wt=$(wt_path "$lower")
+  local did=false
+
+  if has_window "$lower"; then
+    tmux kill-window -t "$SV_SESSION:$lower" 2>/dev/null && { echo "  ✗ Killed agent window: $lower"; did=true; }
+  fi
+  scrub_resurrect_window "$lower"
+  tmux kill-session -t "${lower}-dev" 2>/dev/null && { echo "  ✗ Killed dev server: ${lower}-dev"; did=true; }
+  scrub_resurrect_session "${lower}-dev"
+
+  if [[ -d "$wt" ]]; then
+    if git worktree remove "$wt" 2>/dev/null || git worktree remove --force "$wt" 2>/dev/null; then
+      echo "  ✗ Removed worktree: $wt"
+      did=true
+    else
+      echo "  ⚠ Failed to remove worktree: $wt"
+    fi
+  fi
+
+  git worktree prune 2>/dev/null
+
+  [[ "$quiet" == "true" ]] && return
+
+  if $did; then
+    echo ""
+    echo "🗃️  Shelved $upper — branch and PR preserved"
+    echo "   Run 'sv $upper' to resume"
+  else
+    echo "Nothing to shelve for $upper"
+  fi
+}
+
+cmd_remove() {
+  local lower="$1" upper="$2"
+  cmd_shelve "$lower" "$upper" true
+  echo ""
+
+  local pr_url=$(gh pr list --head "$lower" --json url --jq '.[0].url' 2>/dev/null)
+  if [[ -n "$pr_url" ]]; then
+    gh pr close "$lower" 2>/dev/null \
+      && echo "  ✗ Closed PR: $pr_url" \
+      || echo "  ⚠ Failed to close PR: $pr_url"
+  fi
+
+  if git ls-remote --heads origin "$lower" 2>/dev/null | grep -q "$lower"; then
+    git push origin --delete "$lower" 2>/dev/null \
+      && echo "  ✗ Deleted remote branch: origin/$lower" \
+      || echo "  ⚠ Failed to delete remote branch"
+  fi
+
+  if git show-ref -q "refs/heads/$lower" 2>/dev/null; then
+    git worktree prune 2>/dev/null
+    local current_branch=$(git symbolic-ref --short HEAD 2>/dev/null)
+    if [[ "$current_branch" == "$lower" ]]; then
+      git checkout main 2>/dev/null || git checkout origin/main 2>/dev/null
+    fi
+    local branch_err
+    branch_err=$(git branch -D "$lower" 2>&1) \
+      && echo "  ✗ Deleted local branch: $lower" \
+      || echo "  ⚠ Failed to delete local branch: $branch_err"
+  fi
+
+  echo ""
+  echo "🗑️  Closed $upper — all state cleaned up"
+}
+
+cmd_run() {
+  local lower="$1" upper="$2" fresh="$3" comment="$4" no_attach="$5"
+  local wt=$(wt_path "$lower")
+
+  ensure_sv_session
+
+  # Reattach to live window
+  if [[ "$fresh" == "false" ]] && has_window "$lower"; then
+    if is_alive "$lower"; then
+      ensure_worktree "$lower" "$wt" 2>/dev/null
+      attach "$lower" "♻️  Reattaching to $lower" "$no_attach"
+      return
+    fi
+    tmux kill-window -t "$SV_SESSION:$lower" 2>/dev/null
+    scrub_resurrect_window "$lower"
+    ensure_sv_session
+  fi
+
+  # Fresh: clean slate
+  if [[ "$fresh" == "true" ]]; then
+    tmux kill-window -t "$SV_SESSION:$lower" 2>/dev/null
+    scrub_resurrect_window "$lower"
+    tmux kill-session -t "${lower}-dev" 2>/dev/null
+    scrub_resurrect_session "${lower}-dev"
+    [[ -d "$wt" ]] && git worktree remove --force "$wt" 2>/dev/null
+    git worktree prune 2>/dev/null
+    ensure_sv_session
+  fi
+
+  # Resume: branch exists → worktree + shell
+  if [[ "$fresh" == "false" ]] && git show-ref -q "refs/heads/$lower" 2>/dev/null; then
+    ensure_worktree "$lower" "$wt" || return 1
+    tmux new-window -t "$SV_SESSION" -n "$lower" -c "$wt"
+    tmux set-option -w -t "$SV_SESSION:$lower" remain-on-exit on
+    attach "$lower" "♻️  Resumed $upper — worktree ready" "$no_attach"
+    return
+  fi
+
+  # New ticket: launch pi agent
+  local prompt="solve $upper"
+  [[ -n "$comment" ]] && prompt="solve $upper - $comment"
+
+  tmux new-window -t "$SV_SESSION" -n "$lower" -c "$REPO"
+  tmux set-option -w -t "$SV_SESSION:$lower" remain-on-exit on
+  # Escape double quotes and backslashes in the prompt, then wrap in double quotes.
+  local escaped="${prompt//\\/\\\\}"
+  escaped="${escaped//\"/\\\"}"
+  escaped="${escaped//\$/\\\$}"
+  escaped="${escaped//\`/\\\`}"
+  tmux send-keys -t "$SV_SESSION:$lower" "pi \"${escaped}\"; [ -d '${wt}' ] && cd '${wt}'" Enter
+
+  attach "$lower" "🚀 Launched $lower" "$no_attach"
+}
+
+# --- Main ---
+
+main() {
+  local ticket="" comment="" fresh=false shelve=false remove=false
+  local list=false no_attach=false yes=false
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --comment)
+        if [[ -n "$2" ]]; then comment="$2"; shift
+        else echo "--comment requires a value" >&2; exit 1; fi ;;
+      --fresh)     fresh=true ;;
+      --shelve)    shelve=true ;;
+      --close)     remove=true ;;
+      --list|-l)   list=true ;;
+      --no-attach) no_attach=true ;;
+      --yes|-y)    yes=true ;;
+      --help|-h)   usage; exit 0 ;;
+      --*)         echo "Unknown flag: $1" >&2; exit 1 ;;
+      *)           [[ -z "$ticket" ]] && ticket="$1" || { echo "Unexpected arg: $1" >&2; exit 1; } ;;
+    esac
+    shift
+  done
+
+  $list && { cmd_list; exit; }
+
+  # Bare `sv` — attach to the sv session
+  if [[ -z "$ticket" ]] && ! $shelve && ! $remove; then
+    ensure_sv_session
+    attach "" "📋 sv session" "$no_attach"
+    exit
+  fi
+
+  if [[ -z "$ticket" ]]; then
+    usage
+    exit 1
+  fi
+
+  ticket=$(normalize "$ticket") || exit 1
+  local lower="${ticket:l}"
+
+  $shelve && {
+    if ! $yes; then
+      confirm "Shelve $ticket? This will tear down the window and worktree." || { echo "Aborted." >&2; exit 1; }
+    fi
+    cmd_shelve "$lower" "$ticket"; exit
+  }
+  $remove && {
+    if ! $yes; then
+      confirm "Close $ticket? This will delete the branch, PR, and all local state." || { echo "Aborted." >&2; exit 1; }
+    fi
+    cmd_remove "$lower" "$ticket"; exit
+  }
+
+  cmd_run "$lower" "$ticket" "$fresh" "$comment" "$no_attach"
+}
+
+usage() {
+  cat <<'EOF'
+Usage: sv [ticket] [options]
+
+  sv                          Attach to the sv session
+  sv <ticket>                 Launch agent or reattach
+  sv <ticket> --fresh         Kill window, start fresh
+  sv <ticket> --comment "…"   Pass context to agent
+  sv <ticket> --shelve        Tear down window + worktree, keep branch + PR
+  sv <ticket> --close         Full cleanup: window, worktree, branch, PR
+  sv <ticket> --yes | -y      Skip confirmation on destructive commands
+  sv --list | sv -l           Show active solve tickets
+
+Switch tickets with ctrl-b n/p or ctrl-b <number>.
+Detach with ctrl-b d to return to your shell.
+EOF
+}
+
+main "$@"

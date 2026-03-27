@@ -1,0 +1,202 @@
+# dotfiles — Ubuntu (aarch64) recipes
+
+DOTFILES := justfile_directory() / "../.."
+
+# Show usage
+@default:
+    echo "dotfiles — Ubuntu (aarch64) recipes"
+    echo ""
+    echo "Usage: just machine <recipe>"
+    echo ""
+    echo "Setup:"
+    echo "  init          Full bootstrap (fresh machine)"
+    echo "  update        Update apt packages + all binary-installed tools"
+    echo "  status        Show installed tool versions"
+    echo ""
+    echo "Management:"
+    echo "  link          Re-symlink all configs"
+    echo "  save [msg]    Commit and push dotfile changes"
+    echo ""
+    echo "Edit:"
+    echo "  zsh           zshrc (reloads on save)"
+    echo "  tmux          tmux.conf (reloads on save)"
+    echo "  nvim          neovim config"
+    echo "  starship      prompt config"
+    echo "  git           git config"
+
+[private]
+@assert-linux:
+    [ "$(uname)" = "Linux" ] || { echo "❌ VM recipes are for Linux, not $(uname)"; exit 1; }
+
+# Full bootstrap (fresh machine)
+init: assert-linux
+    {{DOTFILES}}/machine/vm/bootstrap.sh
+
+# Update system packages + all binary-installed CLI tools
+update: assert-linux
+    #!/usr/bin/env bash
+    set -euo pipefail
+    source "{{justfile_directory()}}/versions.env"
+
+    echo "📦 apt packages..."
+    sudo apt-get update -qq && sudo apt-get upgrade -y -qq && sudo apt-get autoremove -y -qq
+
+    echo "📦 neovim..."
+    _tmp=$(mktemp -d)
+    curl -sL "https://github.com/neovim/neovim/releases/latest/download/nvim-linux-arm64.tar.gz" | tar xz -C "$_tmp"
+    sudo rm -rf /opt/nvim && sudo mv "$_tmp/nvim-linux-arm64" /opt/nvim
+    sudo ln -sf /opt/nvim/bin/nvim /usr/local/bin/nvim
+    rm -rf "$_tmp"
+
+    echo "📦 bat..."
+    BAT_VERSION=$(curl -s https://api.github.com/repos/sharkdp/bat/releases/latest | grep tag_name | cut -d'"' -f4)
+    _tmp=$(mktemp -d)
+    curl -sL "https://github.com/sharkdp/bat/releases/download/${BAT_VERSION}/bat-${BAT_VERSION}-aarch64-unknown-linux-gnu.tar.gz" \
+      | tar xz --strip-components=1 -C "$_tmp"
+    sudo mv "$_tmp/bat" /usr/local/bin/bat
+    rm -rf "$_tmp"
+    bat cache --build 2>/dev/null
+
+    echo "📦 eza..."
+    EZA_VERSION=$(curl -s https://api.github.com/repos/eza-community/eza/releases/latest | grep tag_name | cut -d'"' -f4)
+    _tmp=$(mktemp -d)
+    curl -sL "https://github.com/eza-community/eza/releases/download/${EZA_VERSION}/eza_aarch64-unknown-linux-gnu.tar.gz" \
+      | tar xz -C "$_tmp"
+    sudo mv "$_tmp/eza" /usr/local/bin/eza
+    rm -rf "$_tmp"
+
+    echo "📦 delta..."
+    DELTA_VERSION=$(curl -s https://api.github.com/repos/dandavison/delta/releases/latest | grep tag_name | cut -d'"' -f4)
+    _tmp=$(mktemp -d)
+    curl -sL "https://github.com/dandavison/delta/releases/download/${DELTA_VERSION}/delta-${DELTA_VERSION}-aarch64-unknown-linux-gnu.tar.gz" \
+      | tar xz --strip-components=1 -C "$_tmp"
+    sudo mv "$_tmp/delta" /usr/local/bin/delta
+    rm -rf "$_tmp"
+
+    echo "📦 lazygit..."
+    LAZYGIT_VERSION=$(curl -s https://api.github.com/repos/jesseduffield/lazygit/releases/latest | grep tag_name | cut -d'"' -f4 | sed 's/^v//')
+    _tmp=$(mktemp -d)
+    curl -sL "https://github.com/jesseduffield/lazygit/releases/download/v${LAZYGIT_VERSION}/lazygit_${LAZYGIT_VERSION}_Linux_arm64.tar.gz" \
+      | tar xz -C "$_tmp" lazygit
+    sudo mv "$_tmp/lazygit" /usr/local/bin/lazygit
+    rm -rf "$_tmp"
+
+    echo "📦 zoxide..."
+    curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh
+
+    echo "📦 starship..."
+    curl -sS https://starship.rs/install.sh | sh -s -- -y -b "$HOME/.local/bin"
+
+    echo "📦 fnm + node..."
+    curl -fsSL https://fnm.vercel.app/install | bash -s -- --skip-shell
+    export PATH="$HOME/.local/share/fnm:$PATH"
+    eval "$(fnm env)"
+    fnm install --lts
+
+    echo "📦 just..."
+    # Overwrites the running binary. Safe on Linux (old inode stays mapped until
+    # process exits). Remove first so the new write targets a fresh inode —
+    # `cp` into a running binary fails with ETXTBSY.
+    rm -f "$HOME/.local/bin/just"
+    curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to "$HOME/.local/bin"
+
+    echo "📦 tmux..."
+    if ! command -v tmux &>/dev/null || [[ "$(tmux -V)" != "tmux $TMUX_VERSION" ]]; then
+      sudo apt-get install -y -qq libevent-dev ncurses-dev bison
+      _tmp=$(mktemp -d)
+      (
+        cd "$_tmp"
+        curl -sL "https://github.com/tmux/tmux/releases/download/${TMUX_VERSION}/tmux-${TMUX_VERSION}.tar.gz" | tar xz
+        cd "tmux-${TMUX_VERSION}" && ./configure --prefix=/usr/local && make -j"$(nproc)" && sudo make install
+      )
+      rm -rf "$_tmp"
+    else
+      echo "  tmux $(tmux -V | awk '{print $2}') already at target"
+    fi
+
+    echo "📦 uv..."
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+
+    echo "📦 docker..."
+    if ! command -v docker &>/dev/null; then
+      curl -fsSL https://get.docker.com | sh
+      sudo usermod -aG docker "$USER"
+      echo "  ⚠ Log out and back in (or run 'newgrp docker') for group to take effect"
+    else
+      echo "  docker $(docker --version | awk '{print $3}' | tr -d ',') already installed"
+    fi
+
+    echo "📦 pnpm..."
+    export PNPM_HOME="$HOME/.local/share/pnpm"
+    export PATH="$PNPM_HOME:$PATH"
+    curl -fsSL https://get.pnpm.io/install.sh | SHELL=/bin/bash sh -
+    echo "📦 global pnpm packages..."
+    pnpm add -g @anthropic-ai/claude-code @mariozechner/pi-coding-agent
+
+    echo "📦 tmux plugins..."
+    "$HOME/.tmux/plugins/tpm/bin/install_plugins"
+
+    echo "🧹 cleanup..."
+    # Remove oh-my-zsh (replaced by direct plugin sourcing)
+    [[ -d "$HOME/.oh-my-zsh" ]] && rm -rf "$HOME/.oh-my-zsh" && echo "  removed ~/.oh-my-zsh"
+    # Remove apt bat (replaced by binary install)
+    dpkg -l bat &>/dev/null && sudo apt-get remove -y -qq bat && echo "  removed apt bat"
+
+    echo ""
+    echo "✅ Update complete!"
+
+# Show installed tool versions
+status:
+    #!/usr/bin/env bash
+    export PATH="$HOME/.local/bin:$HOME/.local/share/fnm:$HOME/.local/share/pnpm:$PATH"
+    command -v fnm &>/dev/null && eval "$(fnm env)"
+    printf "%-12s %s\n" "os"       "$(lsb_release -ds)"
+    printf "%-12s %s\n" "kernel"   "$(uname -r)"
+    printf "%-12s %s\n" "zsh"      "$(zsh --version | awk '{print $2}')"
+    printf "%-12s %s\n" "nvim"     "$(nvim --version | head -1 | awk '{print $2}')"
+    printf "%-12s %s\n" "tmux"     "$(tmux -V | awk '{print $2}')"
+    printf "%-12s %s\n" "node"     "$(node --version 2>/dev/null || echo 'missing')"
+    printf "%-12s %s\n" "pnpm"     "$(pnpm --version 2>/dev/null || echo 'missing')"
+    printf "%-12s %s\n" "uv"       "$(uv --version 2>/dev/null | awk '{print $2}' || echo 'missing')"
+    printf "%-12s %s\n" "git"      "$(git --version | awk '{print $3}')"
+    printf "%-12s %s\n" "gh"       "$(gh --version | head -1 | awk '{print $3}')"
+    printf "%-12s %s\n" "delta"    "$(delta --version 2>/dev/null | awk '{print $2}')"
+    printf "%-12s %s\n" "starship" "$(starship --version | head -1 | awk '{print $2}')"
+    printf "%-12s %s\n" "eza"      "$(eza --version | sed -n 2p | awk '{print $1}')"
+    printf "%-12s %s\n" "bat"      "$(bat --version | awk '{print $2}')"
+    printf "%-12s %s\n" "rg"       "$(rg --version | head -1 | awk '{print $2}')"
+    printf "%-12s %s\n" "fzf"      "$(fzf --version | awk '{print $1}')"
+    printf "%-12s %s\n" "zoxide"   "$(zoxide --version 2>/dev/null | awk '{print $2}' || echo 'missing')"
+    printf "%-12s %s\n" "lazygit"  "$(lazygit --version | head -1 | sed 's/.*version=//' | cut -d, -f1)"
+    printf "%-12s %s\n" "fnm"      "$(fnm --version 2>/dev/null | awk '{print $2}' || echo 'missing')"
+    printf "%-12s %s\n" "just"     "$(just --version 2>/dev/null | awk '{print $2}' || echo 'missing')"
+    printf "%-12s %s\n" "docker"   "$(docker --version 2>/dev/null | awk '{print $3}' | tr -d ',' || echo 'missing')"
+    printf "%-12s %s\n" "pi"       "$(pi --version 2>/dev/null | awk '{print $NF}' || echo 'missing')"
+    printf "%-12s %s\n" "claude"   "$(claude --version 2>/dev/null | awk '{print $1}' || echo 'missing')"
+
+# Symlink all configs into place
+link:
+    {{DOTFILES}}/install.sh
+
+# Commit and push dotfile changes
+save msg="update dotfiles":
+    cd {{DOTFILES}} && git add -A
+    cd {{DOTFILES}} && git commit -m "{{msg}}"
+    cd {{DOTFILES}} && git push
+
+# Edit configs (interactive — run from terminal)
+[group('edit')]
+zsh:
+    nvim ~/.zshrc && source ~/.zshrc
+[group('edit')]
+tmux:
+    nvim ~/.tmux.conf && tmux source-file ~/.tmux.conf
+[group('edit')]
+nvim:
+    nvim ~/.config/nvim/
+[group('edit')]
+starship:
+    nvim ~/.config/starship.toml
+[group('edit')]
+git:
+    nvim ~/.gitconfig

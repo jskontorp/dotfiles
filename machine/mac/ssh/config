@@ -1,0 +1,6 @@
+Host oracle
+    HostName 100.99.53.45
+    User ubuntu
+    IdentityFile ~/.ssh/oracle-vm.key
+    SetEnv TERM=xterm-256color
+    LocalForward 3000 localhost:3000

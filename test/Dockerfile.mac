@@ -1,0 +1,34 @@
+FROM ubuntu:22.04
+
+# macOS can't be containerized, so we simulate the mac path
+# by setting uname to Darwin via a wrapper
+RUN apt-get update -qq && apt-get install -y -qq \
+    zsh git curl sudo \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN useradd -m -s /bin/zsh testuser \
+    && echo "testuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+USER testuser
+WORKDIR /home/testuser
+ENV HOME=/home/testuser
+ENV PATH="/home/testuser/.local/bin:$PATH"
+
+# Fake uname returning Darwin so install.sh takes the mac path
+RUN mkdir -p ~/.local/bin \
+    && printf '#!/bin/sh\nif [ "$1" = "-s" ]; then echo Darwin; else /usr/bin/uname "$@"; fi\n' \
+    > ~/.local/bin/uname && chmod +x ~/.local/bin/uname
+
+# Stub tools
+RUN mkdir -p ~/.config
+
+# bat stub
+RUN printf '#!/bin/sh\ncase "$1" in --config-dir) echo /home/testuser/.config/bat;; cache) true;; esac\n' \
+    > ~/.local/bin/bat && chmod +x ~/.local/bin/bat
+
+# Simulate a valuesync_os repo at ~/code/valuesync_os
+RUN mkdir -p ~/code/valuesync_os && cd ~/code/valuesync_os && git init -q \
+    && git config user.email "test@test" && git config user.name "test" \
+    && touch README.md && git add . && git commit -qm "init"
+
+COPY --chown=testuser:testuser . /home/testuser/dotfiles

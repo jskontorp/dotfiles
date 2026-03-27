@@ -1,0 +1,43 @@
+# Clean prompt — robbyrussell spirit + cmd_duration
+# Palette: Catppuccin Macchiato (muted pastels, one warm accent)
+
+format = """$hostname$character$directory$git_branch$git_status"""
+right_format = "$cmd_duration"
+
+[character]
+success_symbol = "[➜](#a6da95)"
+error_symbol = "[➜](#ed8796)"
+
+[directory]
+truncation_length = 2
+style = "#cad3f5"
+
+[git_branch]
+format = "[$branch]($style) "
+style = "#f5a97f"
+
+[git_status]
+format = "([$all_status$ahead_behind]($style) )"
+style = "#a5adcb"
+modified = "!"
+untracked = "?"
+ahead = "⇡"
+behind = "⇣"
+staged = "+"
+
+[cmd_duration]
+min_time = 2_000
+format = "[$duration]($style)"
+style = "#6e738d"
+
+[hostname]
+ssh_only = true
+format = "[$hostname]($style) "
+style = "#ee99a0 bold"
+
+[nodejs]
+disabled = true
+[package]
+disabled = true
+[python]
+disabled = true

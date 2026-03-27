@@ -1,0 +1,28 @@
+# Core CLI tools
+brew "git"
+brew "gh"
+brew "curl"
+brew "wget"
+brew "jq"
+
+# Modern CLI replacements
+brew "eza"             # ls replacement
+brew "bat"             # cat replacement
+brew "ripgrep"         # grep replacement
+brew "fd"              # find replacement
+brew "git-delta"       # diff pager
+brew "zoxide"          # smart cd
+brew "fzf"             # fuzzy finder
+brew "lazygit"         # git TUI
+
+# Shell
+brew "starship"        # prompt
+brew "zsh-autosuggestions"
+brew "zsh-syntax-highlighting"
+
+# Dev tools
+brew "tmux"
+brew "neovim"
+brew "node"
+brew "pnpm"
+brew "just"
