@@ -79,6 +79,7 @@ fi
 # --- Project: valuesync_os ---
 # Symlink project-specific pi config if the repo exists.
 # The target dirs (.pi/skills, .pi/extensions) should be gitignored in the project.
+# AGENTS.md is NOT managed here — it lives in the project repo and follows normal git.
 VS_CANDIDATES=(
   "$HOME/code/valuesync_os"
   "$HOME/work/valuesync_os"
@@ -103,9 +104,6 @@ if [[ -n "$VS_DIR" ]]; then
   # Project extensions (wipe target dir to avoid nested symlinks)
   rm -rf "$VS_PI/extensions"
   ln -sfn "$DOTFILES/projects/valuesync_os/extensions" "$VS_PI/extensions"
-
-  # Project AGENTS.md (layered on top of global by pi)
-  ln -sf "$DOTFILES/projects/valuesync_os/AGENTS.md" "$VS_DIR/AGENTS.md"
 else
   echo "valuesync_os not found, skipping project config"
 fi

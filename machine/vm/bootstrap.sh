@@ -53,7 +53,7 @@ fi
 ln -sf "$SCRIPT_DIR/tmux.conf" ~/.tmux.conf
 
 # --- Install all tools via just update ---
-just -f "$SCRIPT_DIR/justfile" update
+just -f "$DOTFILES/justfile" update
 
 # --- Tailscale ---
 if ! command -v tailscale &>/dev/null; then

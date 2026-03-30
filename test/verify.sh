@@ -75,7 +75,6 @@ run_test() {
   local vs
   if [[ "$machine" == "mac" ]]; then vs="/home/testuser/code/valuesync_os"; else vs="/home/testuser/work/valuesync_os"; fi
 
-  check "valuesync_os AGENTS.md linked"    "dexec test -L $vs/AGENTS.md"
   check "valuesync_os .pi/skills linked"   "dexec test -L $vs/.pi/skills"
   check "valuesync_os .pi/extensions linked" "dexec test -L $vs/.pi/extensions"
   check "5 project skills"                 "dexec bash -c '[ \$(ls $vs/.pi/skills | wc -l) -eq 5 ]'"
@@ -98,8 +97,6 @@ run_test() {
     'dexec bash -c "! grep -q \"Load skills when\" ~/.pi/agent/skills/solve-ticket/SKILL.md"'
   check "AGENTS.md contains NAJA" \
     'dexec grep -q NAJA /home/testuser/.pi/agent/AGENTS.md'
-  check "project AGENTS.md has skill table" \
-    "dexec grep -q frontend-design $vs/AGENTS.md"
 
   docker rm -f "$CONTAINER" >/dev/null 2>&1
   printf "\n"

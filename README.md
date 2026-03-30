@@ -11,7 +11,7 @@ machine/vm/       VM-specific (zshrc, starship, tmux, nvim, bin/sv, bootstrap)
 pi/agent/         Global pi agent config (AGENTS.md, skills)
 projects/         Project-specific pi config (symlinked into project repos)
 zsh/              Shell helpers (git-helpers, sv-proxy, sv-completion, ssh-theme)
-test/             Validation scripts
+test/             Docker-based validation
 ```
 
 ## Setup
@@ -19,23 +19,26 @@ test/             Validation scripts
 ```bash
 git clone <repo> ~/dotfiles
 cd ~/dotfiles
-./install.sh        # detects machine, links everything
-```
-
-Machine-specific tasks (brew updates, building tools from source):
-
-```bash
-just machine <recipe>
+./install.sh
 ```
 
 ### Bootstrap (fresh machine)
 
 ```bash
-# macOS
-./machine/mac/bootstrap.sh
+just init     # runs machine/mac/bootstrap.sh or machine/vm/bootstrap.sh
+```
 
-# VM
-./machine/vm/bootstrap.sh
+## Commands
+
+```
+just              List all recipes
+just status       Installed tool versions
+just update       Upgrade packages + tools (brew on mac, builds from source on vm)
+just link         Re-symlink all configs
+just save "msg"   Commit and push
+just test         Run Docker validation (vm, mac, or both)
+just zsh          Edit zshrc (reloads on save)
+just ghostty      Edit Ghostty config (mac only)
 ```
 
 ## Project config
