@@ -1,5 +1,8 @@
 # dotfiles — unified config for macOS and Linux
 
+default:
+    @just --list
+
 DOTFILES := justfile_directory()
 MAC      := DOTFILES / "machine/mac"
 VM       := DOTFILES / "machine/vm"
