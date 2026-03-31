@@ -24,7 +24,7 @@ update:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "📦 Homebrew..."
-    brew update && brew upgrade && brew cleanup
+    brew update && brew bundle --file="{{MAC}}/Brewfile" && brew upgrade && brew cleanup
     echo "📦 tmux plugins..."
     "$HOME/.tmux/plugins/tpm/bin/install_plugins"
     echo "✅ Done"
@@ -36,7 +36,23 @@ update:
     source "{{VM}}/versions.env"
 
     echo "📦 apt..."
-    sudo apt-get update -qq && sudo apt-get upgrade -y -qq && sudo apt-get autoremove -y -qq
+    sudo apt-get update -qq && sudo apt-get upgrade -y -qq
+    sudo apt-get install -y -qq \
+      zsh git gh curl wget unzip jq fzf \
+      ripgrep fd-find \
+      build-essential
+    sudo apt-get autoremove -y -qq
+
+    echo "📦 zsh plugins..."
+    ZSH_PLUGINS="$HOME/.local/share/zsh/plugins"
+    mkdir -p "$ZSH_PLUGINS"
+    for plugin in zsh-autosuggestions zsh-syntax-highlighting; do
+      if [[ -d "$ZSH_PLUGINS/$plugin" ]]; then
+        git -C "$ZSH_PLUGINS/$plugin" pull -q
+      else
+        git clone --depth=1 "https://github.com/zsh-users/$plugin" "$ZSH_PLUGINS/$plugin"
+      fi
+    done
 
     _install() { echo "📦 $1..."; }
 
@@ -194,10 +210,6 @@ status:
 # Symlink all configs
 link:
     {{DOTFILES}}/install.sh
-
-# Commit and push
-save msg="update dotfiles":
-    cd {{DOTFILES}} && git add -A && git commit -m "{{msg}}" && git push
 
 # Run install validation in Docker
 test target="both":
