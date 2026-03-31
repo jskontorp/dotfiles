@@ -114,4 +114,10 @@ else
   echo "valuesync_os not found, skipping project config"
 fi
 
+# --- Git hooks (for the dotfiles repo itself) ---
+if [[ -d "$DOTFILES/.git" ]]; then
+  mkdir -p "$DOTFILES/.git/hooks"
+  ln -sf "$DOTFILES/git/hooks/pre-commit" "$DOTFILES/.git/hooks/pre-commit"
+fi
+
 echo "✅ Dotfiles linked ($MACHINE)"

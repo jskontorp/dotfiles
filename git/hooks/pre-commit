@@ -1,0 +1,15 @@
+#!/bin/bash
+# Pre-commit hook: shellcheck on staged .sh files.
+# Symlinked into .git/hooks/ by install.sh.
+set -euo pipefail
+
+if ! command -v shellcheck &>/dev/null; then
+  printf "⚠ shellcheck not installed — skipping lint (brew install shellcheck)\n" >&2
+  exit 0
+fi
+
+mapfile -t files < <(git diff --cached --name-only --diff-filter=ACM -- '*.sh')
+[[ ${#files[@]} -eq 0 ]] && exit 0
+
+printf "shellcheck: %d file(s)\n" "${#files[@]}"
+shellcheck "${files[@]}"
