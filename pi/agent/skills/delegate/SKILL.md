@@ -60,7 +60,7 @@ Present the plan as a table:
 | task-3 | Synthesise findings | task-1, task-2 | 300s | read |
 
 **Sub-agents:** 3 (2 parallel + 1 sequential)
-**Model:** claude-sonnet-4-20250514 (inherited)
+**Model:** (inherited from parent agent)
 **Estimated cost:** ~3 sub-agent invocations
 
 Proceed?
