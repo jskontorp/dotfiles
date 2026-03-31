@@ -26,6 +26,19 @@ RUN mkdir -p ~/.config
 RUN printf '#!/bin/sh\ncase "$1" in --config-dir) echo /home/testuser/.config/bat;; cache) true;; esac\n' \
     > ~/.local/bin/bat && chmod +x ~/.local/bin/bat
 
+# brew stub (--prefix returns stub dir with empty plugin files)
+RUN mkdir -p ~/.local/share/brew/share/zsh-syntax-highlighting \
+    ~/.local/share/brew/share/zsh-autosuggestions \
+    && touch ~/.local/share/brew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh \
+    && touch ~/.local/share/brew/share/zsh-autosuggestions/zsh-autosuggestions.zsh \
+    && printf '#!/bin/sh\ncase "$1" in --prefix) echo /home/testuser/.local/share/brew;; esac\n' \
+    > ~/.local/bin/brew && chmod +x ~/.local/bin/brew
+
+# zoxide, starship, fzf stubs (output empty string for eval)
+RUN printf '#!/bin/sh\necho ""\n' > ~/.local/bin/zoxide && chmod +x ~/.local/bin/zoxide \
+    && printf '#!/bin/sh\necho ""\n' > ~/.local/bin/starship && chmod +x ~/.local/bin/starship \
+    && printf '#!/bin/sh\necho ""\n' > ~/.local/bin/fzf && chmod +x ~/.local/bin/fzf
+
 # Simulate a valuesync_os repo at ~/code/valuesync_os
 RUN mkdir -p ~/code/valuesync_os && cd ~/code/valuesync_os && git init -q \
     && git config user.email "test@test" && git config user.name "test" \

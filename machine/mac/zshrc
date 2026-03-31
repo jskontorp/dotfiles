@@ -17,37 +17,13 @@ setopt always_to_end        # cursor moves to end after completion
 setopt complete_in_word     # tab completes mid-word, not just at end
 setopt auto_menu            # show completion menu on second tab
 
-# --- History ---
-HISTFILE=~/.zsh_history
-HISTSIZE=10000
-SAVEHIST=10000
-setopt share_history
-setopt hist_ignore_dups
-setopt hist_ignore_space
-setopt hist_verify          # expand !! but show it before running
-setopt extended_history     # timestamps in history
+# --- Shared config (history, aliases, PATH, terminal integration) ---
+source ~/.config/zsh/core.zsh
 
-# --- Shell behaviour ---
-setopt auto_cd              # type a dir name to cd into it
+# --- Mac-specific behaviour ---
 cdpath=(~/code ~/code/personal)
-setopt interactivecomments  # allow # comments in terminal
-export EDITOR="nvim"
-export VISUAL="$EDITOR"
 
-# --- Aliases ---
-alias cat="bat --paging=never"
-alias lg="lazygit"
-
-# ls → eza
-alias ls="eza --color=always --group-directories-first"
-alias ll="eza -la --color=always --group-directories-first --icons"
-alias la="eza -a --color=always --group-directories-first --icons"
-alias lt="eza -T --color=always --group-directories-first --icons --level=2"
-
-# --- PATH ---
-export PATH="$HOME/.local/bin:$PATH"
-
-# pnpm
+# --- pnpm ---
 export PNPM_HOME="$HOME/Library/pnpm"
 case ":$PATH:" in
   *":$PNPM_HOME:"*) ;;
@@ -70,29 +46,25 @@ eval "$(fzf --zsh)"         # ctrl-r fuzzy history, ctrl-t file finder, alt-c cd
 eval "$(zoxide init zsh)"   # z <partial> smart cd
 eval "$(starship init zsh)"
 
-# Emit OSC 7 so Ghostty (and other terminals) know the cwd for new tabs
-autoload -Uz add-zsh-hook
-__ghostty_osc7() {
-  printf '\e]7;file://%s%s\a' "${HOST}" "${PWD}"
-}
-add-zsh-hook chpwd __ghostty_osc7
-__ghostty_osc7  # emit once at shell startup
-
 # --- Custom helpers (tracked in dotfiles/zsh/) ---
-for f in ~/.config/zsh/*.zsh(N); do source "$f"; done
+for f in ~/.config/zsh/*.zsh(N); do
+  [[ "${f:t}" == "core.zsh" ]] && continue
+  source "$f"
+done
 
 # --- Local overrides (not tracked) ---
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
 
 # --- Kiro CLI autosuggest conflict guard ---
-# Kiro CLI bundles its own zsh-autosuggestions (prefixed _kiro_cli_autosuggest_*)
-# that shares the "autosuggest-orig-" widget namespace with brew's version.
-# If both end up loaded, the shared prefix creates circular widget references
-# (infinite recursion → FUNCNEST).  Remove kiro's precmd rebinder if present,
-# and tear down its widget wrappers so re-sourcing doesn't stack them.
+# Kiro CLI (as of March 2025) bundles its own zsh-autosuggestions prefixed
+# _kiro_cli_autosuggest_* that shares the "autosuggest-orig-" widget namespace
+# with Homebrew's version.  Both loaded → circular widget references → FUNCNEST.
+# Tear down Kiro's copy so the Homebrew version wins cleanly.
+#
+# TODO: Remove once Kiro fixes the widget namespace collision, or if Kiro is
+#       uninstalled.  Track: https://github.com/aws/kiro/issues (if public).
 if (( ${+functions[_kiro_cli_autosuggest_start]} )); then
   add-zsh-hook -d precmd _kiro_cli_autosuggest_start
-  # Remove Kiro's bound widgets to break circular references
   local w
   for w in ${(k)widgets[(I)_kiro_cli_autosuggest_bound_*]}; do
     zle -D "$w" 2>/dev/null

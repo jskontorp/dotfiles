@@ -46,8 +46,14 @@ ln -sf "$M/lazygit/config.yml" "$LAZYGIT_DIR/config.yml"
 # Remove stale symlinks first
 find ~/.config/zsh -maxdepth 1 -type l ! -exec test -e {} \; -delete 2>/dev/null
 
-# Always linked
-ln -sf "$DOTFILES/zsh/git-helpers.zsh" ~/.config/zsh/
+# Always linked (core is sourced explicitly by zshrc, helpers via glob)
+ln -sf "$DOTFILES/zsh/core.zsh"          ~/.config/zsh/
+ln -sf "$DOTFILES/zsh/git-aliases.zsh"   ~/.config/zsh/
+ln -sf "$DOTFILES/zsh/git-helpers.zsh"   ~/.config/zsh/
+ln -sf "$DOTFILES/zsh/git-worktrees.zsh" ~/.config/zsh/
+
+# Clean up renamed files from previous installs
+rm -f ~/.config/zsh/sv.zsh  # renamed to sv-completion.zsh
 
 # Machine-specific zsh helpers
 if [[ "$MACHINE" == "mac" ]]; then

@@ -1,6 +1,10 @@
 #!/bin/bash
 # Validate the dotfiles install in clean Docker containers.
 # Usage: ./test/verify.sh [vm|mac|both]
+#
+# shellcheck disable=SC2294  # eval in check() is the intended test-harness pattern
+# shellcheck disable=SC2088  # ~ in descriptions is display text, not a path
+# shellcheck disable=SC2016  # single-quoted command strings are eval'd, not expanded here
 set -euo pipefail
 
 DOTFILES="$(cd "$(dirname "$0")/.." && pwd)"
@@ -35,6 +39,15 @@ run_test() {
   docker rm -f "$CONTAINER" 2>/dev/null || true
   docker run -d --name "$CONTAINER" "$image" sleep 3600 >/dev/null
 
+  # --- Seed old state for migration tests ---
+  # Simulate a previous install: orphan sv.zsh (valid symlink to old target)
+  # and a stale broken symlink. install.sh must clean both.
+  printf "Seeding old state...\n"
+  dexec bash -c "mkdir -p ~/.config/zsh ~/old_dotfiles/zsh"
+  dexec bash -c "echo '# old sv completion' > ~/old_dotfiles/zsh/sv.zsh"
+  dexec bash -c "ln -sf ~/old_dotfiles/zsh/sv.zsh ~/.config/zsh/sv.zsh"
+  dexec bash -c "ln -sf /nonexistent/old-helper.zsh ~/.config/zsh/old-helper.zsh"
+
   printf "Running install.sh...\n"
   dexec bash -c "cd ~/dotfiles && ./install.sh"
   printf "\nVerifying...\n"
@@ -53,7 +66,10 @@ run_test() {
   check "lazygit config symlinked"         'dexec bash -c "test -L \$(find ~/.config -path */lazygit/config.yml 2>/dev/null || echo /nonexistent)"'
 
   # --- zsh helpers ---
+  check "core.zsh linked"                 'dexec test -L /home/testuser/.config/zsh/core.zsh'
+  check "git-aliases.zsh linked"           'dexec test -L /home/testuser/.config/zsh/git-aliases.zsh'
   check "git-helpers.zsh linked"           'dexec test -L /home/testuser/.config/zsh/git-helpers.zsh'
+  check "git-worktrees.zsh linked"         'dexec test -L /home/testuser/.config/zsh/git-worktrees.zsh'
 
   if [[ "$machine" == "mac" ]]; then
     check "sv-proxy.zsh linked"            'dexec test -L /home/testuser/.config/zsh/sv-proxy.zsh'
@@ -97,6 +113,33 @@ run_test() {
     'dexec bash -c "! grep -q \"Load skills when\" ~/.pi/agent/skills/solve-ticket/SKILL.md"'
   check "AGENTS.md contains NAJA" \
     'dexec grep -q NAJA /home/testuser/.pi/agent/AGENTS.md'
+
+  # --- zsh config: core.zsh dedup + git split ---
+  check "core: EDITOR=nvim"               'dexec zsh -i -c "[[ \$EDITOR == nvim ]]"'
+  check "core: HISTSIZE=10000"             'dexec zsh -i -c "[[ \$HISTSIZE -eq 10000 ]]"'
+  check "core: auto_cd enabled"            'dexec zsh -i -c "[[ -o auto_cd ]]"'
+  check "core: cat alias"                  'dexec zsh -i -c "whence -w cat | grep -q alias"'
+  check "core: ls alias"                   'dexec zsh -i -c "whence -w ls | grep -q alias"'
+  check "git alias: gco"                   'dexec zsh -i -c "whence -w gco | grep -q alias"'
+  check "git alias: grr"                   'dexec zsh -i -c "whence -w grr | grep -q alias"'
+  check "git fn: gdc"                      'dexec zsh -i -c "whence -w gdc | grep -q function"'
+  check "git fn: gae"                      'dexec zsh -i -c "whence -w gae | grep -q function"'
+  check "git fn: gcof"                     'dexec zsh -i -c "whence -w gcof | grep -q function"'
+  check "git fn: gwt"                      'dexec zsh -i -c "whence -w gwt | grep -q function"'
+  check "git fn: gwts"                     'dexec zsh -i -c "whence -w gwts | grep -q function"'
+  check "git fn: gwtr"                     'dexec zsh -i -c "whence -w gwtr | grep -q function"'
+  check "git fn: _gwt_root (internal)"     'dexec zsh -i -c "whence -w _gwt_root | grep -q function"'
+
+  # --- Migration cleanup ---
+  check "orphan sv.zsh removed"            'dexec bash -c "! test -e /home/testuser/.config/zsh/sv.zsh"'
+  check "stale broken symlink removed"     'dexec bash -c "! test -L /home/testuser/.config/zsh/old-helper.zsh"'
+
+  # --- Re-source safety ---
+  # zsh -i sources ~/.zshrc once; the script sources it again.
+  # Catches: PATH accumulation, hook duplication, FUNCNEST crashes.
+  check "re-source safe (no dupes, no FUNCNEST)" \
+    'dexec zsh -i /home/testuser/dotfiles/test/resource-check.zsh'
+  check "core not double-sourced"          'dexec zsh -i -c "source ~/.zshrc; c=0; for f in \$chpwd_functions; do [[ \$f == __osc7_cwd ]] && ((c++)); done; (( c == 1 ))"'
 
   docker rm -f "$CONTAINER" >/dev/null 2>&1
   printf "\n"

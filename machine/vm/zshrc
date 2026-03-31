@@ -11,42 +11,19 @@ bindkey -e
 bindkey '^[[A' history-search-backward
 bindkey '^[[B' history-search-forward
 
-# --- History ---
-HISTFILE=~/.zsh_history
-HISTSIZE=10000
-SAVEHIST=10000
-setopt share_history
-setopt hist_ignore_dups
-setopt hist_ignore_space
-setopt hist_verify
-setopt extended_history
+# --- Shared config (history, aliases, PATH, terminal integration) ---
+source ~/.config/zsh/core.zsh
 
-# --- Shell behaviour ---
-setopt auto_cd
-setopt interactivecomments
-export EDITOR="nvim"
-export VISUAL="$EDITOR"
-
-# --- Aliases ---
-alias cat="bat --paging=never"
-alias lg="lazygit"
-
-# ls → eza
-alias ls="eza --color=always --group-directories-first"
-alias ll="eza -la --color=always --group-directories-first --icons"
-alias la="eza -a --color=always --group-directories-first --icons"
-alias lt="eza -T --color=always --group-directories-first --icons --level=2"
-
-# --- PATH ---
-export PATH="$HOME/.local/bin:$PATH"
-
-# fnm
+# --- fnm ---
 if [[ -d "$HOME/.local/share/fnm" ]]; then
-  export PATH="$HOME/.local/share/fnm:$PATH"
+  case ":$PATH:" in
+    *":$HOME/.local/share/fnm:"*) ;;
+    *) export PATH="$HOME/.local/share/fnm:$PATH" ;;
+  esac
   eval "$(fnm env)"
 fi
 
-# pnpm
+# --- pnpm ---
 export PNPM_HOME="$HOME/.local/share/pnpm"
 case ":$PATH:" in
   *":$PNPM_HOME:"*) ;;
@@ -54,26 +31,26 @@ case ":$PATH:" in
 esac
 
 # --- Plugins (sourced directly, no framework) ---
+# Guard: these plugins wrap zle widgets and don't handle re-sourcing.
+# Re-sourcing stacks wrappers until FUNCNEST is hit.  Source once per session.
 source_if() { [[ -f "$1" ]] && source "$1"; }
-source_if /usr/share/doc/fzf/examples/key-bindings.zsh
-source_if /usr/share/doc/fzf/examples/completion.zsh
-source_if "$HOME/.local/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh"
-source_if "$HOME/.local/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+if [[ -z "${_DOTFILES_PLUGINS_SOURCED:-}" ]]; then
+  source_if /usr/share/doc/fzf/examples/key-bindings.zsh
+  source_if /usr/share/doc/fzf/examples/completion.zsh
+  source_if "$HOME/.local/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh"
+  source_if "$HOME/.local/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+  _DOTFILES_PLUGINS_SOURCED=1
+fi
 
 # --- Tools ---
 eval "$(zoxide init zsh)"
 eval "$(starship init zsh)"
 
-# Emit OSC 7 so terminals (Ghostty, etc.) know the cwd for new tabs
-autoload -Uz add-zsh-hook
-__osc7_cwd() {
-  printf '\e]7;file://%s%s\a' "${HOST}" "${PWD}"
-}
-add-zsh-hook chpwd __osc7_cwd
-__osc7_cwd  # emit once at shell startup
-
 # --- Custom helpers (tracked in dotfiles/zsh/) ---
-for f in ~/.config/zsh/*.zsh(N); do source "$f"; done
+for f in ~/.config/zsh/*.zsh(N); do
+  [[ "${f:t}" == "core.zsh" ]] && continue
+  source "$f"
+done
 
 # --- Local overrides (not tracked) ---
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local

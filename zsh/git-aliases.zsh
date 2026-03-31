@@ -1,0 +1,17 @@
+# Git aliases — common shortcuts
+
+alias gco="git checkout"
+alias gb="git branch"
+alias gs="git status"
+alias gpl="git pull"
+alias gps="git push"
+alias gpf="git push --force"
+alias gl="git log --oneline"
+alias gd="git diff"
+alias ga="git add ."
+alias gc="git commit -m"
+alias gbd="git branch -D"
+alias gca="git commit --amend --no-edit"
+alias grc="git rebase --continue"
+alias gra="git rebase --abort"
+alias grr="git restore . && git clean -fd"
