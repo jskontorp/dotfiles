@@ -8,7 +8,8 @@ if ! command -v shellcheck &>/dev/null; then
   exit 0
 fi
 
-mapfile -t files < <(git diff --cached --name-only --diff-filter=ACM -- '*.sh')
+files=()
+while IFS= read -r f; do files+=("$f"); done < <(git diff --cached --name-only --diff-filter=ACM -- '*.sh')
 [[ ${#files[@]} -eq 0 ]] && exit 0
 
 printf "shellcheck: %d file(s)\n" "${#files[@]}"
