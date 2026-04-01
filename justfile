@@ -42,6 +42,7 @@ update:
       ripgrep fd-find \
       build-essential
     sudo apt-get autoremove -y -qq
+    sudo ln -sf "$(which fdfind)" /usr/local/bin/fd 2>/dev/null || true
 
     echo "📦 zsh plugins..."
     ZSH_PLUGINS="$HOME/.local/share/zsh/plugins"
@@ -56,6 +57,17 @@ update:
 
     _install() { echo "📦 $1..."; }
 
+    # _fetch_binary <name> <url> <binary> [strip-components]
+    # Downloads a tarball, extracts the named binary, installs to /usr/local/bin.
+    _fetch_binary() {
+      local name="$1" url="$2" binary="${3:-$1}" strip="${4:-0}"
+      _install "$name"
+      local tmp=$(mktemp -d)
+      curl -sL "$url" | tar xz --strip-components="$strip" -C "$tmp"
+      sudo mv "$tmp/$binary" /usr/local/bin/"$binary"
+      rm -rf "$tmp"
+    }
+
     _install neovim
     _tmp=$(mktemp -d)
     curl -sL "https://github.com/neovim/neovim/releases/latest/download/nvim-linux-arm64.tar.gz" | tar xz -C "$_tmp"
@@ -63,38 +75,26 @@ update:
     sudo ln -sf /opt/nvim/bin/nvim /usr/local/bin/nvim
     rm -rf "$_tmp"
 
-    _install bat
     BAT_VERSION=$(curl -s https://api.github.com/repos/sharkdp/bat/releases/latest | grep tag_name | cut -d'"' -f4)
-    _tmp=$(mktemp -d)
-    curl -sL "https://github.com/sharkdp/bat/releases/download/${BAT_VERSION}/bat-${BAT_VERSION}-aarch64-unknown-linux-gnu.tar.gz" \
-      | tar xz --strip-components=1 -C "$_tmp"
-    sudo mv "$_tmp/bat" /usr/local/bin/bat
-    rm -rf "$_tmp"
+    _fetch_binary bat \
+      "https://github.com/sharkdp/bat/releases/download/${BAT_VERSION}/bat-${BAT_VERSION}-aarch64-unknown-linux-gnu.tar.gz" \
+      bat 1
     bat cache --build 2>/dev/null
 
-    _install eza
     EZA_VERSION=$(curl -s https://api.github.com/repos/eza-community/eza/releases/latest | grep tag_name | cut -d'"' -f4)
-    _tmp=$(mktemp -d)
-    curl -sL "https://github.com/eza-community/eza/releases/download/${EZA_VERSION}/eza_aarch64-unknown-linux-gnu.tar.gz" \
-      | tar xz -C "$_tmp"
-    sudo mv "$_tmp/eza" /usr/local/bin/eza
-    rm -rf "$_tmp"
+    _fetch_binary eza \
+      "https://github.com/eza-community/eza/releases/download/${EZA_VERSION}/eza_aarch64-unknown-linux-gnu.tar.gz" \
+      eza
 
-    _install delta
     DELTA_VERSION=$(curl -s https://api.github.com/repos/dandavison/delta/releases/latest | grep tag_name | cut -d'"' -f4)
-    _tmp=$(mktemp -d)
-    curl -sL "https://github.com/dandavison/delta/releases/download/${DELTA_VERSION}/delta-${DELTA_VERSION}-aarch64-unknown-linux-gnu.tar.gz" \
-      | tar xz --strip-components=1 -C "$_tmp"
-    sudo mv "$_tmp/delta" /usr/local/bin/delta
-    rm -rf "$_tmp"
+    _fetch_binary delta \
+      "https://github.com/dandavison/delta/releases/download/${DELTA_VERSION}/delta-${DELTA_VERSION}-aarch64-unknown-linux-gnu.tar.gz" \
+      delta 1
 
-    _install lazygit
     LAZYGIT_VERSION=$(curl -s https://api.github.com/repos/jesseduffield/lazygit/releases/latest | grep tag_name | cut -d'"' -f4 | sed 's/^v//')
-    _tmp=$(mktemp -d)
-    curl -sL "https://github.com/jesseduffield/lazygit/releases/download/v${LAZYGIT_VERSION}/lazygit_${LAZYGIT_VERSION}_Linux_arm64.tar.gz" \
-      | tar xz -C "$_tmp" lazygit
-    sudo mv "$_tmp/lazygit" /usr/local/bin/lazygit
-    rm -rf "$_tmp"
+    _fetch_binary lazygit \
+      "https://github.com/jesseduffield/lazygit/releases/download/v${LAZYGIT_VERSION}/lazygit_${LAZYGIT_VERSION}_Linux_arm64.tar.gz" \
+      lazygit
 
     _install zoxide
     curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh
