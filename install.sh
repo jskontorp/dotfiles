@@ -32,6 +32,7 @@ bat cache --build >/dev/null 2>&1
 
 # --- Machine-specific configs ---
 ln -sf "$M/zshrc"          ~/.zshrc
+ln -sf "$DOTFILES/shared/tmux.conf" ~/.tmux.shared.conf
 ln -sf "$M/tmux.conf"      ~/.tmux.conf
 ln -sf "$M/starship.toml"  ~/.config/starship.toml
 
@@ -42,7 +43,7 @@ else
   LAZYGIT_DIR="$HOME/.config/lazygit"
 fi
 mkdir -p "$LAZYGIT_DIR"
-ln -sf "$M/lazygit/config.yml" "$LAZYGIT_DIR/config.yml"
+ln -sf "$DOTFILES/shared/lazygit/config.yml" "$LAZYGIT_DIR/config.yml"
 
 # --- zsh helpers ---
 # Remove stale symlinks first

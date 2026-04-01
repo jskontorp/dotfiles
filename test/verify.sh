@@ -62,6 +62,7 @@ run_test() {
   # --- Machine configs ---
   check "~/.zshrc symlinked"               'dexec test -L /home/testuser/.zshrc'
   check "~/.tmux.conf symlinked"           'dexec test -L /home/testuser/.tmux.conf'
+  check "~/.tmux.shared.conf symlinked"    'dexec test -L /home/testuser/.tmux.shared.conf'
   check "starship.toml symlinked"          'dexec test -L /home/testuser/.config/starship.toml'
   check "lazygit config symlinked"         'dexec bash -c "test -L \$(find ~/.config -path */lazygit/config.yml 2>/dev/null || echo /nonexistent)"'
 
