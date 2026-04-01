@@ -20,6 +20,8 @@ M="$DOTFILES/machine/$MACHINE"
 mkdir -p ~/.config ~/.config/zsh ~/.pi/agent
 
 ln -sf "$DOTFILES/shared/gitconfig"      ~/.gitconfig
+rm -rf ~/.config/nvim
+ln -sfn "$DOTFILES/shared/nvim"          ~/.config/nvim
 ln -sf "$DOTFILES/pi/agent/AGENTS.md"    ~/.pi/agent/AGENTS.md
 ln -sfn "$DOTFILES/pi/agent/skills"      ~/.pi/agent/skills
 
@@ -78,8 +80,7 @@ if [[ "$MACHINE" == "vm" ]]; then
   mkdir -p ~/.local/bin
   ln -sf "$M/bin/sv" ~/.local/bin/sv
 
-  rm -rf ~/.config/nvim
-  ln -sfn "$M/nvim" ~/.config/nvim
+  # nvim is shared (linked above)
 fi
 
 # --- Project: valuesync_os ---
