@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: shellcheck
-        run: shellcheck install.sh test/verify.sh
+        run: shellcheck install.sh init.sh machine/mac/bootstrap.sh machine/vm/bootstrap.sh test/verify.sh
 
   docker-test:
     runs-on: ubuntu-latest
