@@ -3,7 +3,6 @@
 # Usage: ./test/verify.sh [vm|mac|both]
 #
 # shellcheck disable=SC2294  # eval in check() is the intended test-harness pattern
-# shellcheck disable=SC2088  # ~ in descriptions is display text, not a path
 # shellcheck disable=SC2016  # single-quoted command strings are eval'd, not expanded here
 set -euo pipefail
 
@@ -40,8 +39,6 @@ run_test() {
   docker run -d --name "$CONTAINER" "$image" sleep 3600 >/dev/null
 
   # --- Seed old state for migration tests ---
-  # Simulate a previous install: orphan sv.zsh (valid symlink to old target)
-  # and a stale broken symlink. install.sh must clean both.
   printf "Seeding old state...\n"
   dexec bash -c "mkdir -p ~/.config/zsh ~/old_dotfiles/zsh"
   dexec bash -c "echo '# old sv completion' > ~/old_dotfiles/zsh/sv.zsh"
@@ -50,72 +47,56 @@ run_test() {
 
   printf "Running install.sh...\n"
   dexec bash -c "cd ~/dotfiles && ./install.sh"
-  printf "\nVerifying...\n"
 
-  # --- Shared ---
-  check "~/.gitconfig symlinked"            'dexec test -L /home/testuser/.gitconfig'
-  check "~/.pi/agent/AGENTS.md symlinked"   'dexec test -L /home/testuser/.pi/agent/AGENTS.md'
-  check "~/.pi/agent/skills symlinked"      'dexec test -L /home/testuser/.pi/agent/skills'
-  check "10 skills present"                 'dexec bash -c "[ \$(ls ~/.pi/agent/skills | wc -l) -eq 10 ]"'
-  check "bat theme symlinked"              'dexec test -L "/home/testuser/.config/bat/themes/Catppuccin Mocha.tmTheme"'
-
-  # --- Machine configs ---
-  check "~/.zshrc symlinked"               'dexec test -L /home/testuser/.zshrc'
-  check "~/.tmux.conf symlinked"           'dexec test -L /home/testuser/.tmux.conf'
-  check "~/.tmux.shared.conf symlinked"    'dexec test -L /home/testuser/.tmux.shared.conf'
-  check "starship.toml symlinked"          'dexec test -L /home/testuser/.config/starship.toml'
-  check "lazygit config symlinked"         'dexec bash -c "test -L \$(find ~/.config -path */lazygit/config.yml 2>/dev/null || echo /nonexistent)"'
-
-  # --- zsh helpers ---
-  check "core.zsh linked"                 'dexec test -L /home/testuser/.config/zsh/core.zsh'
-  check "git-aliases.zsh linked"           'dexec test -L /home/testuser/.config/zsh/git-aliases.zsh'
-  check "git-helpers.zsh linked"           'dexec test -L /home/testuser/.config/zsh/git-helpers.zsh'
-  check "git-worktrees.zsh linked"         'dexec test -L /home/testuser/.config/zsh/git-worktrees.zsh'
-
-  if [[ "$machine" == "mac" ]]; then
-    check "sv-proxy.zsh linked"            'dexec test -L /home/testuser/.config/zsh/sv-proxy.zsh'
-    check "ssh-theme.zsh linked"           'dexec test -L /home/testuser/.config/zsh/ssh-theme.zsh'
-    check "sv-completion.zsh absent"       'dexec bash -c "! test -e /home/testuser/.config/zsh/sv-completion.zsh"'
-    check "~/.ssh/config linked"           'dexec test -L /home/testuser/.ssh/config'
-    check "Ghostty config linked"          'dexec test -L "/home/testuser/Library/Application Support/com.mitchellh.ghostty/config"'
+  # --- Symlinks (manifest-driven) ---
+  # install.sh records every symlink to .install-manifest via _link/_linkd.
+  # validate-manifest.sh checks each entry is a valid symlink with a live
+  # target, verifies the count is sane, and detects raw ln calls that
+  # bypassed the manifest.
+  printf "\nSymlinks:\n"
+  if dexec bash /home/testuser/dotfiles/test/validate-manifest.sh; then
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1))
   fi
 
+  # --- Platform correctness: wrong-platform files must be absent ---
+  printf "\nPlatform correctness:\n"
+  if [[ "$machine" == "mac" ]]; then
+    check "sv-completion.zsh absent"       'dexec bash -c "! test -e /home/testuser/.config/zsh/sv-completion.zsh"'
+  fi
   if [[ "$machine" == "vm" ]]; then
-    check "sv-completion.zsh linked"       'dexec test -L /home/testuser/.config/zsh/sv-completion.zsh'
     check "sv-proxy.zsh absent"            'dexec bash -c "! test -e /home/testuser/.config/zsh/sv-proxy.zsh"'
     check "ssh-theme.zsh absent"           'dexec bash -c "! test -e /home/testuser/.config/zsh/ssh-theme.zsh"'
-    check "~/.local/bin/sv linked"         'dexec test -L /home/testuser/.local/bin/sv'
-    check "~/.config/nvim linked"          'dexec test -L /home/testuser/.config/nvim'
   fi
 
-  # --- Project: valuesync_os ---
-  local vs
-  if [[ "$machine" == "mac" ]]; then vs="/home/testuser/code/valuesync_os"; else vs="/home/testuser/work/valuesync_os"; fi
+  # --- Config syntax validation ---
+  printf "\nConfig syntax:\n"
+  check "gitconfig parses cleanly"         'dexec git config --file /home/testuser/.gitconfig --list'
 
-  check "valuesync_os .pi/skills linked"   "dexec test -L $vs/.pi/skills"
-  check "valuesync_os .pi/extensions linked" "dexec test -L $vs/.pi/extensions"
-  check "5 project skills"                 "dexec bash -c '[ \$(ls $vs/.pi/skills | wc -l) -eq 5 ]'"
-  check "3 extension entries"              "dexec bash -c '[ \$(ls $vs/.pi/extensions | wc -l) -eq 3 ]'"
-
-  # --- Integrity ---
-  check "no broken symlinks" \
+  # --- Install integrity ---
+  printf "\nIntegrity:\n"
+  check "no broken symlinks in \$HOME" \
     'dexec bash -c "! find /home/testuser -maxdepth 5 -type l ! -exec test -e {} \; -print 2>/dev/null | grep -qv .git"'
-
   check "zshrc sources cleanly" \
     'dexec zsh -i -c "exit 0"'
-
   check "install.sh is idempotent" \
     'dexec bash -c "cd ~/dotfiles && ./install.sh"'
 
+  # --- Migration cleanup ---
+  printf "\nMigration:\n"
+  check "orphan sv.zsh removed"            'dexec bash -c "! test -e /home/testuser/.config/zsh/sv.zsh"'
+  check "stale broken symlink removed"     'dexec bash -c "! test -L /home/testuser/.config/zsh/old-helper.zsh"'
+
   # --- Skill content spot checks ---
-  check "delegate has scripts/" \
-    'dexec test -d /home/testuser/.pi/agent/skills/delegate/scripts'
+  printf "\nSkill content:\n"
+  check "delegate has scripts/"            'dexec test -d /home/testuser/.pi/agent/skills/delegate/scripts'
   check "solve-ticket has no skill-loading table" \
     'dexec bash -c "! grep -q \"Load skills when\" ~/.pi/agent/skills/solve-ticket/SKILL.md"'
-  check "AGENTS.md contains NAJA" \
-    'dexec grep -q NAJA /home/testuser/.pi/agent/AGENTS.md'
+  check "AGENTS.md contains NAJA"          'dexec grep -q NAJA /home/testuser/.pi/agent/AGENTS.md'
 
-  # --- zsh config: core.zsh dedup + git split ---
+  # --- Shell behaviour ---
+  printf "\nShell behaviour:\n"
   check "core: EDITOR=nvim"               'dexec zsh -i -c "[[ \$EDITOR == nvim ]]"'
   check "core: HISTSIZE=10000"             'dexec zsh -i -c "[[ \$HISTSIZE -eq 10000 ]]"'
   check "core: auto_cd enabled"            'dexec zsh -i -c "[[ -o auto_cd ]]"'
@@ -131,13 +112,8 @@ run_test() {
   check "git fn: gwtr"                     'dexec zsh -i -c "whence -w gwtr | grep -q function"'
   check "git fn: _gwt_root (internal)"     'dexec zsh -i -c "whence -w _gwt_root | grep -q function"'
 
-  # --- Migration cleanup ---
-  check "orphan sv.zsh removed"            'dexec bash -c "! test -e /home/testuser/.config/zsh/sv.zsh"'
-  check "stale broken symlink removed"     'dexec bash -c "! test -L /home/testuser/.config/zsh/old-helper.zsh"'
-
   # --- Re-source safety ---
-  # zsh -i sources ~/.zshrc once; the script sources it again.
-  # Catches: PATH accumulation, hook duplication, FUNCNEST crashes.
+  printf "\nRe-source safety:\n"
   check "re-source safe (no dupes, no FUNCNEST)" \
     'dexec zsh -i /home/testuser/dotfiles/test/resource-check.zsh'
   check "core not double-sourced"          'dexec zsh -i -c "source ~/.zshrc; c=0; for f in \$chpwd_functions; do [[ \$f == __osc7_cwd ]] && ((c++)); done; (( c == 1 ))"'
