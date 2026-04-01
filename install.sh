@@ -84,36 +84,45 @@ if [[ "$MACHINE" == "vm" ]]; then
   # nvim is shared (linked above)
 fi
 
-# --- Project: valuesync_os ---
-# Symlink project-specific pi config if the repo exists.
-# The target dirs (.pi/skills, .pi/extensions) should be gitignored in the project.
-# AGENTS.md is NOT managed here — it lives in the project repo and follows normal git.
-VS_CANDIDATES=(
-  "$HOME/code/valuesync_os"
-  "$HOME/work/valuesync_os"
-)
-VS_DIR=""
-for candidate in "${VS_CANDIDATES[@]}"; do
-  if [[ -d "$candidate/.git" ]]; then
-    VS_DIR="$candidate"
-    break
-  fi
-done
+# --- Project-specific pi config ---
+# Reads projects.conf for candidate paths, symlinks skills/ and extensions/
+# into each project's .pi/ directory. AGENTS.md is NOT managed here — it
+# lives in the project repo and follows normal git.
+if [[ -f "$DOTFILES/projects.conf" ]]; then
+  _project_found=""
+  while IFS= read -r line; do
+    # Skip comments and blank lines
+    [[ "$line" =~ ^[[:space:]]*# ]] && continue
+    [[ -z "${line// /}" ]] && continue
 
-if [[ -n "$VS_DIR" ]]; then
-  echo "Found valuesync_os at $VS_DIR"
-  VS_PI="$VS_DIR/.pi"
-  mkdir -p "$VS_PI"
+    read -r name candidate <<< "$line"
+    candidate="${candidate/#\~/$HOME}"
 
-  # Project skills
-  rm -rf "$VS_PI/skills"
-  ln -sfn "$DOTFILES/projects/valuesync_os/skills" "$VS_PI/skills"
+    # Skip if we already found this project
+    [[ " $_project_found " == *" $name "* ]] && continue
 
-  # Project extensions (wipe target dir to avoid nested symlinks)
-  rm -rf "$VS_PI/extensions"
-  ln -sfn "$DOTFILES/projects/valuesync_os/extensions" "$VS_PI/extensions"
-else
-  echo "valuesync_os not found, skipping project config"
+    if [[ -d "$candidate/.git" ]]; then
+      _project_found+=" $name"
+      echo "Found $name at $candidate"
+      local_pi="$candidate/.pi"
+      mkdir -p "$local_pi"
+
+      # Symlink each subdirectory present in projects/<name>/
+      for sub in "$DOTFILES/projects/$name"/*/; do
+        [[ ! -d "$sub" ]] && continue
+        sub_name="$(basename "$sub")"
+        rm -rf "${local_pi:?}/${sub_name:?}"
+        ln -sfn "$sub" "$local_pi/$sub_name"
+      done
+    fi
+  done < "$DOTFILES/projects.conf"
+
+  # Report projects not found
+  for dir in "$DOTFILES/projects"/*/; do
+    [[ ! -d "$dir" ]] && continue
+    pname="$(basename "$dir")"
+    [[ " $_project_found " != *" $pname "* ]] && echo "$pname not found, skipping project config"
+  done
 fi
 
 # --- Git hooks (for the dotfiles repo itself) ---
