@@ -33,7 +33,6 @@ esac
 # --- Plugins (sourced directly, no framework) ---
 # Guard: these plugins wrap zle widgets and don't handle re-sourcing.
 # Re-sourcing stacks wrappers until FUNCNEST is hit.  Source once per session.
-source_if() { [[ -f "$1" ]] && source "$1"; }
 if [[ -z "${_DOTFILES_PLUGINS_SOURCED:-}" ]]; then
   source_if /usr/share/doc/fzf/examples/key-bindings.zsh
   source_if /usr/share/doc/fzf/examples/completion.zsh

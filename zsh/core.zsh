@@ -27,6 +27,9 @@ alias ll="eza -la --color=always --group-directories-first --icons"
 alias la="eza -a --color=always --group-directories-first --icons"
 alias lt="eza -T --color=always --group-directories-first --icons --level=2"
 
+# --- Helpers ---
+source_if() { [[ -f "$1" ]] && source "$1"; }
+
 # --- PATH ---
 case ":$PATH:" in
   *":$HOME/.local/bin:"*) ;;

@@ -36,8 +36,8 @@ esac
 # FUNCNEST is hit.  Source once per session, skip on `source ~/.zshrc`.
 BREW_PREFIX="$(brew --prefix)"
 if [[ -z "${_DOTFILES_PLUGINS_SOURCED:-}" ]]; then
-  source "$BREW_PREFIX/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
-  source "$BREW_PREFIX/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
+  source_if "$BREW_PREFIX/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+  source_if "$BREW_PREFIX/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
   _DOTFILES_PLUGINS_SOURCED=1
 fi
 
