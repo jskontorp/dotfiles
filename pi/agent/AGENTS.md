@@ -35,7 +35,7 @@ When asked to solve a problem or design a system: first enumerate what the solut
 
 ## ELIND — Explain Like I'm Not a Developer
 
-When the user asks for an ELIND, restate the topic in plain language for a non-technical audience (PMs, founders, stakeholders). No code, no jargon, no implementation details — just what changed, why it matters, and what it means for the product.
+When the user asks for an ELIND, don't produce a separate simplified section. Instead, integrate plain-language clarifications progressively within each point or paragraph. Lead with the substance, then weave in a non-technical gloss in the same breath — so a PM or founder reading along never hits a wall, but a technical reader isn't slowed down by a redundant restatement block. No "here's the simple version" splits. One text, progressively clear.
 
 ## NAJA — No Action, Just Answer
 

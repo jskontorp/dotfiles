@@ -15,7 +15,6 @@ setopt extended_history     # timestamps in history
 setopt auto_cd              # type a dir name to cd into it
 setopt interactivecomments  # allow # comments in terminal
 export EDITOR="nvim"
-export VISUAL="$EDITOR"
 
 # --- Aliases ---
 alias cat="bat --paging=never"
