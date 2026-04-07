@@ -50,6 +50,7 @@ fi
 # --- TPM (must exist before `just update` runs tmux plugin install) ---
 [[ -d "$HOME/.tmux/plugins/tpm" ]] || \
   git clone --depth=1 https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
+ln -sf "$DOTFILES/shared/tmux.conf" ~/.tmux.shared.conf
 ln -sf "$SCRIPT_DIR/tmux.conf" ~/.tmux.conf
 
 # --- Install all tools via just update ---

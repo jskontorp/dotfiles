@@ -19,15 +19,15 @@ fi
 echo "📦 Installing packages from Brewfile..."
 brew bundle --file="$SCRIPT_DIR/Brewfile"
 
+# --- Symlink dotfiles (before TPM so ~/.tmux.conf exists) ---
+source "$DOTFILES/install.sh"
+
 # --- TPM + tmux plugins ---
 echo "📦 Installing tmux plugin manager..."
 [[ -d "$HOME/.tmux/plugins/tpm" ]] || \
   git clone --depth=1 https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
 echo "📦 Installing tmux plugins via TPM..."
 "$HOME/.tmux/plugins/tpm/bin/install_plugins"
-
-# --- Symlink dotfiles ---
-source "$DOTFILES/install.sh"
 
 # --- Git identity (stored in ~/.gitconfig.local, not in the repo) ---
 if [[ ! -f "$HOME/.gitconfig.local" ]]; then
