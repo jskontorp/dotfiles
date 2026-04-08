@@ -104,7 +104,7 @@ sv() {
     if $skip_next; then skip_next=false; continue; fi
     case "$arg" in
       --list|-l)                    is_list=true; needs_attach=false; break ;;
-      --shelve|--close)             needs_attach=false; break ;;
+      --shelve|--close)             needs_attach=false ;;
       --comment)                    skip_next=true ;;
       --*)                          ;;
       *)                            raw_ticket="$arg"; needs_attach=true ;;
