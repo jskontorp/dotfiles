@@ -15,6 +15,40 @@ _SV_LOCAL_WT_BASE="${_SV_LOCAL_REPO}_worktrees"
 _SV_CACHE="$HOME/.cache/sv-tickets"
 _SV_SESSION="sv"
 
+# --- Port forwarding ---
+_SV_TUNNEL_DIR="$HOME/.cache/sv-tunnels"
+
+_sv_ticket_port() {
+  local digits="${1//[^0-9]/}"
+  [[ ${#digits} -gt 3 ]] && digits="${digits: -3}"
+  echo $(( 3000 + 10#$digits ))
+}
+
+_sv_start_tunnel() {
+  local port=$1
+  mkdir -p "$_SV_TUNNEL_DIR"
+  local pidfile="$_SV_TUNNEL_DIR/$port.pid"
+
+  if [[ -f "$pidfile" ]] && kill -0 "$(cat "$pidfile")" 2>/dev/null; then
+    return 0
+  fi
+
+  ssh -NL "$port:localhost:$port" "$_SV_REMOTE" &>/dev/null &
+  local pid=$!
+  disown $pid 2>/dev/null
+  echo $pid > "$pidfile"
+  echo "  🔗 localhost:$port → vm:$port"
+}
+
+_sv_stop_tunnel() {
+  local port=$1
+  local pidfile="$_SV_TUNNEL_DIR/$port.pid"
+  [[ -f "$pidfile" ]] || return 0
+  local pid=$(<"$pidfile")
+  kill "$pid" 2>/dev/null && echo "  ✗ Closed port forward: $port"
+  rm -f "$pidfile"
+}
+
 # --- Helpers ---
 
 _sv_warn_local() {
@@ -152,10 +186,15 @@ sv() {
 
     _sv_warn_local "$lower" || return 0
 
+    local port=$(_sv_ticket_port "$lower")
+
     # Phase 1: set up session on VM (no attach, no TTY needed)
     _sv_remote "$_SV_REMOTE_SV --no-attach ${quoted_args[*]}" || return 1
 
-    # Phase 2: attach to the sv session (v3: single session, ticket windows)
+    # Phase 2: start port-forward tunnel
+    _sv_start_tunnel "$port"
+
+    # Phase 3: attach to the sv session (v3: single session, ticket windows)
     if ! ssh -t "$_SV_REMOTE" "tmux attach -t '$_SV_SESSION'"; then
       echo "Attach failed. Reconnect with: ssh -t $_SV_REMOTE 'tmux attach -t $_SV_SESSION'" >&2
       return 1
@@ -193,6 +232,13 @@ sv() {
   fi
 
   _sv_remote "$_SV_REMOTE_SV ${quoted_args[*]}"
+
+  # Stop port-forward tunnel on shelve/close
+  if [[ -n "$action" && -n "$raw_ticket" ]]; then
+    local _lower=$(echo "$raw_ticket" | tr '[:upper:]' '[:lower:]')
+    [[ "$_lower" =~ ^[0-9]+$ ]] && _lower="vs-$_lower"
+    _sv_stop_tunnel "$(_sv_ticket_port "$_lower")"
+  fi
 }
 
 # --- Completion ---

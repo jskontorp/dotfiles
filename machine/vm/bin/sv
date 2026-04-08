@@ -224,6 +224,12 @@ ensure_worktree() {
   fi
 }
 
+ticket_port() {
+  local digits="${1//[^0-9]/}"
+  [[ ${#digits} -gt 3 ]] && digits="${digits: -3}"
+  echo $(( 3000 + 10#$digits ))
+}
+
 # --- Commands ---
 
 cmd_list() {
@@ -274,7 +280,8 @@ cmd_list() {
       [[ -n "$behind" && "$behind" -gt 0 ]] && branch_info="${branch_info:+$branch_info }−${behind}"
     fi
 
-    printf "  %s %-10s %-24s %s\n" "$dot" "$upper" "${(j:, :)parts}" "$branch_info"
+    local port=$(ticket_port "$t")
+    printf "  %s %-10s :%-4s  %-24s %s\n" "$dot" "$upper" "$port" "${(j:, :)parts}" "$branch_info"
   done
   echo ""
 }
@@ -380,14 +387,17 @@ cmd_run() {
 
   # Resume: branch exists → worktree + shell
   if [[ "$fresh" == "false" ]] && git show-ref -q "refs/heads/$lower" 2>/dev/null; then
+    local port=$(ticket_port "$lower")
     ensure_worktree "$lower" "$wt" || return 1
     tmux new-window -t "$SV_SESSION" -n "$lower" -c "$wt"
     tmux set-option -w -t "$SV_SESSION:$lower" remain-on-exit on
-    attach "$lower" "♻️  Resumed $upper — worktree ready" "$no_attach"
+    tmux send-keys -t "$SV_SESSION:$lower" "export PORT=$port" Enter
+    attach "$lower" "♻️  Resumed $upper (dev → localhost:$port)" "$no_attach"
     return
   fi
 
   # New ticket: launch pi agent
+  local port=$(ticket_port "$lower")
   local prompt="solve $upper"
   [[ -n "$comment" ]] && prompt="solve $upper - $comment"
 
@@ -398,9 +408,9 @@ cmd_run() {
   escaped="${escaped//\"/\\\"}"
   escaped="${escaped//\$/\\\$}"
   escaped="${escaped//\`/\\\`}"
-  tmux send-keys -t "$SV_SESSION:$lower" "pi \"${escaped}\"; [ -d '${wt}' ] && cd '${wt}'" Enter
+  tmux send-keys -t "$SV_SESSION:$lower" "export PORT=$port; pi \"${escaped}\"; [ -d '${wt}' ] && cd '${wt}'" Enter
 
-  attach "$lower" "🚀 Launched $lower" "$no_attach"
+  attach "$lower" "🚀 Launched $lower (dev → localhost:$port)" "$no_attach"
 }
 
 # --- Main ---
