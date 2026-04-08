@@ -209,7 +209,10 @@ attach() {
 ensure_worktree() {
   local lower="$1" wt="$2"
 
-  [[ -d "$wt" ]] && git -C "$wt" rev-parse --git-dir &>/dev/null && return 0
+  if [[ -d "$wt" ]] && git -C "$wt" rev-parse --git-dir &>/dev/null; then
+    echo "PORT=$(ticket_port "$lower")" > "$wt/.env.development.local"
+    return 0
+  fi
 
   git show-ref -q "refs/heads/$lower" 2>/dev/null || return 1
 
@@ -219,6 +222,7 @@ ensure_worktree() {
   mkdir -p "$(dirname "$wt")"
   git worktree add "$wt" "$lower" || { echo "Failed to create worktree" >&2; return 1; }
   [[ -f "$REPO/.env.local" && ! -e "$wt/.env.local" ]] && ln -s "$REPO/.env.local" "$wt/.env.local"
+  echo "PORT=$(ticket_port "$lower")" > "$wt/.env.development.local"
   if [[ -f "$wt/package.json" && ! -d "$wt/node_modules" ]]; then
     (cd "$wt" && pnpm install) || echo "⚠ pnpm install failed in $wt — run it manually" >&2
   fi
