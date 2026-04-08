@@ -4,3 +4,5 @@ Host oracle
     IdentityFile ~/.ssh/oracle-vm.key
     SetEnv TERM=xterm-256color
     LocalForward 3000 localhost:3000
+    ServerAliveInterval 15
+    ServerAliveCountMax 3
