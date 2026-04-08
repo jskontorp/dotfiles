@@ -135,7 +135,17 @@ if [[ -f "$DOTFILES/projects.conf" ]]; then
       for sub in "$DOTFILES/projects/$name"/*/; do
         [[ ! -d "$sub" ]] && continue
         sub_name="$(basename "$sub")"
-        _linkd "$sub" "$local_pi/$sub_name"
+        if [[ "$sub_name" == "skills" ]]; then
+          # Individual skill symlinks (same pattern as global skills)
+          [[ -L "$local_pi/skills" ]] && rm "$local_pi/skills"
+          mkdir -p "$local_pi/skills"
+          for skill in "$sub"*/; do
+            [[ ! -d "$skill" ]] && continue
+            _linkd "$skill" "$local_pi/skills/$(basename "$skill")"
+          done
+        else
+          _linkd "$sub" "$local_pi/$sub_name"
+        fi
       done
     fi
   done < "$DOTFILES/projects.conf"
