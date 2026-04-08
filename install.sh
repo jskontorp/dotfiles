@@ -44,7 +44,12 @@ mkdir -p ~/.config ~/.config/zsh ~/.pi/agent
 _link "$DOTFILES/shared/gitconfig"      ~/.gitconfig
 _linkd "$DOTFILES/shared/nvim"          ~/.config/nvim
 _link "$DOTFILES/pi/agent/AGENTS.md"    ~/.pi/agent/AGENTS.md
-_linkd "$DOTFILES/pi/agent/skills"      ~/.pi/agent/skills
+# Replace old whole-directory symlink with a real directory
+[[ -L ~/.pi/agent/skills ]] && rm ~/.pi/agent/skills
+mkdir -p ~/.pi/agent/skills
+for skill in "$DOTFILES/pi/agent/skills"/*/; do
+  _linkd "$skill" ~/.pi/agent/skills/"$(basename "$skill")"
+done
 
 # bat theme
 mkdir -p "$(bat --config-dir)/themes"

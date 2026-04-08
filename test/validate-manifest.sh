@@ -38,7 +38,7 @@ EXPECTED=(
   "$HOME/.gitconfig"
   "$HOME/.config/nvim"
   "$HOME/.pi/agent/AGENTS.md"
-  "$HOME/.pi/agent/skills"
+  "$HOME/.pi/agent/skills/commit"
   "$HOME/.zshrc"
   "$HOME/.tmux.shared.conf"
   "$HOME/.tmux.conf"
