@@ -118,10 +118,16 @@ sv() {
 
   # --- Bare sv: attach to existing session (no repo setup needed) ---
   if [[ $# -eq 0 ]]; then
-    if ! ssh "$_SV_REMOTE" "tmux has-session -t '$_SV_SESSION'" 2>/dev/null; then
+    local _windows
+    _windows=$(ssh "$_SV_REMOTE" "tmux list-windows -t '$_SV_SESSION' -F '#W'" 2>/dev/null)
+    if [[ $? -ne 0 ]]; then
       echo "No sv session on $_SV_REMOTE. Start one with: sv <ticket>" >&2
       return 1
     fi
+    local _w
+    for _w in ${(f)_windows}; do
+      [[ "$_w" =~ ^tech-[0-9]+$ ]] && _sv_start_tunnel "$(_sv_ticket_port "$_w")"
+    done
     if ! ssh -t "$_SV_REMOTE" "tmux attach -t '$_SV_SESSION'"; then
       echo "Attach failed. Reconnect with: ssh -t $_SV_REMOTE 'tmux attach -t $_SV_SESSION'" >&2
       return 1
