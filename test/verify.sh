@@ -68,6 +68,15 @@ run_test() {
   if [[ "$machine" == "vm" ]]; then
     check "sv-proxy.zsh absent"            'dexec bash -c "! test -e /home/testuser/.config/zsh/sv-proxy.zsh"'
     check "ssh-theme.zsh absent"           'dexec bash -c "! test -e /home/testuser/.config/zsh/ssh-theme.zsh"'
+
+    # --- sv ticket_port logic ---
+    # Extract just the function (can't source sv — top-level code exits outside a repo)
+    printf "\nsv ticket_port:\n"
+    dexec zsh -c 'sed -n "/^ticket_port()/,/^}/p" ~/.local/bin/sv > /tmp/ticket_port.zsh'
+    check "tech-1 → 3001"       'dexec zsh -c "source /tmp/ticket_port.zsh; [[ \$(ticket_port tech-1) == 3001 ]]"'
+    check "tech-123 → 3123"     'dexec zsh -c "source /tmp/ticket_port.zsh; [[ \$(ticket_port tech-123) == 3123 ]]"'
+    check "tech-1234 → 3234"    'dexec zsh -c "source /tmp/ticket_port.zsh; [[ \$(ticket_port tech-1234) == 3234 ]]"'
+    check "tech-8 → 3008"       'dexec zsh -c "source /tmp/ticket_port.zsh; [[ \$(ticket_port tech-8) == 3008 ]]"'
   fi
 
   # --- Config syntax validation ---
