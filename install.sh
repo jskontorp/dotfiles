@@ -52,13 +52,6 @@ for skill in "$DOTFILES/pi/agent/skills"/*/; do
   _linkd "$skill" ~/.pi/agent/skills/"$(basename "$skill")"
 done
 
-[[ -L ~/.pi/agent/extensions ]] && rm ~/.pi/agent/extensions
-mkdir -p ~/.pi/agent/extensions
-for ext in "$DOTFILES/pi/agent/extensions"/*/; do
-  [[ ! -d "$ext" ]] && continue
-  _linkd "$ext" ~/.pi/agent/extensions/"$(basename "$ext")"
-done
-
 # bat theme
 mkdir -p "$(bat --config-dir)/themes"
 _link "$DOTFILES/shared/bat/themes/Catppuccin Mocha.tmTheme" "$(bat --config-dir)/themes/"
