@@ -210,7 +210,10 @@ ensure_worktree() {
   local lower="$1" wt="$2"
 
   if [[ -d "$wt" ]] && git -C "$wt" rev-parse --git-dir &>/dev/null; then
-    echo "PORT=$(ticket_port "$lower")" > "$wt/.env.development.local"
+    local env_line="PORT=$(ticket_port "$lower")"
+    if [[ ! -f "$wt/.env.development.local" ]] || ! grep -qxF "$env_line" "$wt/.env.development.local"; then
+      echo "$env_line" > "$wt/.env.development.local"
+    fi
     return 0
   fi
 
