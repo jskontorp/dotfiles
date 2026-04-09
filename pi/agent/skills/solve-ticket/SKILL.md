@@ -126,13 +126,15 @@ Tell the user: `Dev server: tmux attach -t <ticket>-dev`
 
 Write code in the worktree. Follow AGENTS.md conventions.
 
-Work incrementally — one concern at a time. Run `pnpm build` after each significant change. Monitor dev server via `tmux capture-pane -p -t "$DEV_SESSION" -S -50` and fix runtime errors immediately. If the port is taken, Next.js auto-increments — note the actual URL from tmux output.
+Work incrementally — one concern at a time. Run `pnpm build` after each significant change. Monitor dev server via `tmux capture-pane -p -t "$DEV_SESSION" -S -50` and fix runtime errors immediately. If an error isn't immediately obvious, load the **systematic-debugging** skill — do not guess-and-fix. If the port is taken, Next.js auto-increments — note the actual URL from tmux output.
 
 Update progress file after each completed plan step.
 
 ## Phase 5 — Verify
 
 Run the **Verification** procedure. Fix all errors before proceeding.
+
+If the ticket involves UI changes, also verify visually using the **webapp-testing** skill. If verification requires risky or destructive operations, use the **sandbox** skill.
 
 ## Phase 6 — Peer Review
 
@@ -215,7 +217,7 @@ Route based on PR state:
 - **Worktree only** — never modify the main repo after Phase 2.
 - **Plan first** — no code without user approval.
 - **Verify → peer review → user review before commit.**
-- **No bare `git push`** — only via `gh pr create --draft`, or when the user explicitly asks.
+- **No bare `git push`** — only via `gh pr create --draft`, or when the user explicitly asks. Follow the **gh-cli** skill for all GitHub operations.
 - **One ticket, no scope creep** — related issues are noted, not implemented.
-- **3-strike cap** — after 3 failed attempts at the same error, ask the user.
+- **3-strike cap** — after 3 failed attempts at the same error, load the **systematic-debugging** skill for structured root cause analysis. If that also stalls (3+ fixes failed), load the **step-back** skill to question the approach. Only then escalate to the user.
 - **Ambiguity → ask.**

@@ -84,6 +84,7 @@ Zoom out across all changed files.
 6. **Circular imports** — A imports B imports A.
 7. **Migration safety** — additive? Access control policies included?
 8. **Pattern consistency** — does the PR introduce a second way to do something that already has an established pattern?
+9. **Approach validity** — is the PR layering workarounds, compensating for a deeper problem, or solving the wrong thing entirely? If so, flag as 🔴 and recommend loading the **step-back** skill before proceeding with fixes.
 
 ## Phase 4 — Report and wait
 
