@@ -21,22 +21,22 @@ _sv() {
 
     # From sv session windows
     local w
-    for w in $(tmux list-windows -t sv -F '#W' 2>/dev/null | grep -oE '^vs-[0-9]+' | sed 's/^vs-//' | sort -u); do
+    for w in $(tmux list-windows -t sv -F '#W' 2>/dev/null | grep -oE '^tech-[0-9]+' | sed 's/^tech-//' | sort -u); do
       tickets+=($w)
     done
 
     # From dev sessions (still separate tmux sessions)
     local s
-    for s in $(tmux list-sessions -F '#S' 2>/dev/null | sed -n 's/^vs-\([0-9]\{1,\}\)-dev$/\1/p' | sort -u); do
+    for s in $(tmux list-sessions -F '#S' 2>/dev/null | sed -n 's/^tech-\([0-9]\{1,\}\)-dev$/\1/p' | sort -u); do
       tickets+=($s)
     done
 
     # From worktrees and branches
-    for d in "$wt_base"/vs-*(N); do
-      [[ -d "$d" ]] && tickets+=(${$(basename "$d")#vs-})
+    for d in "$wt_base"/tech-*(N); do
+      [[ -d "$d" ]] && tickets+=(${$(basename "$d")#tech-})
     done
     local b
-    for b in $(git -C "$repo" branch --format='%(refname:short)' 2>/dev/null | sed -n 's/^vs-//p'); do
+    for b in $(git -C "$repo" branch --format='%(refname:short)' 2>/dev/null | sed -n 's/^tech-//p'); do
       [[ -n "$b" ]] && tickets+=($b)
     done
 

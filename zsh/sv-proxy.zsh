@@ -144,24 +144,24 @@ sv() {
     # Extract VM ticket ids for dedup + cache
     local -a vm_tickets=()
     for line in ${(f)vm_output}; do
-      [[ "$line" =~ 'VS-([0-9]+)' ]] && vm_tickets+=("vs-${match[1]}")
+      [[ "$line" =~ 'TECH-([0-9]+)' ]] && vm_tickets+=("tech-${match[1]}")
     done
 
     mkdir -p "$(dirname "$_SV_CACHE")"
-    printf '%s\n' "${vm_tickets[@]#vs-}" > "$_SV_CACHE" 2>/dev/null
+    printf '%s\n' "${vm_tickets[@]#tech-}" > "$_SV_CACHE" 2>/dev/null
 
     # Show local-only tickets
     if [[ -d "$_SV_LOCAL_REPO" ]]; then
       local -a local_only=()
 
       if [[ -d "$_SV_LOCAL_WT_BASE" ]]; then
-        for d in "$_SV_LOCAL_WT_BASE"/vs-*(N); do
+        for d in "$_SV_LOCAL_WT_BASE"/tech-*(N); do
           local t=$(basename "$d")
           (( ${vm_tickets[(I)$t]} )) || local_only+=("$t")
         done
       fi
 
-      for b in $(git -C "$_SV_LOCAL_REPO" branch --format='%(refname:short)' 2>/dev/null | grep -E '^vs-[0-9]+$'); do
+      for b in $(git -C "$_SV_LOCAL_REPO" branch --format='%(refname:short)' 2>/dev/null | grep -E '^tech-[0-9]+$'); do
         (( ${local_only[(I)$b]} )) || (( ${vm_tickets[(I)$b]} )) || local_only+=("$b")
       done
 
@@ -175,7 +175,7 @@ sv() {
         done
         echo ""
 
-        for t in "${local_only[@]}"; do echo "${t#vs-}"; done >> "$_SV_CACHE"
+        for t in "${local_only[@]}"; do echo "${t#tech-}"; done >> "$_SV_CACHE"
       fi
     fi
     return
@@ -184,8 +184,8 @@ sv() {
   # --- Attach: two-phase SSH ---
   if $needs_attach; then
     local lower=$(echo "$raw_ticket" | tr '[:upper:]' '[:lower:]')
-    [[ "$lower" =~ ^[0-9]+$ ]] && lower="vs-$lower"
-    if [[ ! "$lower" =~ ^vs-[0-9]+$ ]]; then
+    [[ "$lower" =~ ^[0-9]+$ ]] && lower="tech-$lower"
+    if [[ ! "$lower" =~ ^tech-[0-9]+$ ]]; then
       echo "Invalid ticket: $raw_ticket"
       return 1
     fi
@@ -224,7 +224,7 @@ sv() {
       return 1
     fi
     local upper="${raw_ticket:u}"
-    [[ "$upper" =~ ^[0-9]+$ ]] && upper="VS-$upper"
+    [[ "$upper" =~ ^[0-9]+$ ]] && upper="TECH-$upper"
     local detail="This will tear down the window and worktree."
     [[ "$action" == "Close" ]] && detail="This will delete the branch, PR, and all local state."
     printf "%s %s? %s [y/N] " "$action" "$upper" "$detail"
@@ -242,7 +242,7 @@ sv() {
   # Stop port-forward tunnel on shelve/close
   if [[ -n "$action" && -n "$raw_ticket" ]]; then
     local _lower=$(echo "$raw_ticket" | tr '[:upper:]' '[:lower:]')
-    [[ "$_lower" =~ ^[0-9]+$ ]] && _lower="vs-$_lower"
+    [[ "$_lower" =~ ^[0-9]+$ ]] && _lower="tech-$_lower"
     _sv_stop_tunnel "$(_sv_ticket_port "$_lower")"
   fi
 }
@@ -257,10 +257,10 @@ _sv() {
   fi
 
   if [[ -d "$_SV_LOCAL_REPO" ]]; then
-    for d in "$_SV_LOCAL_WT_BASE"/vs-*(N); do
-      [[ -d "$d" ]] && tickets+=(${$(basename "$d")#vs-})
+    for d in "$_SV_LOCAL_WT_BASE"/tech-*(N); do
+      [[ -d "$d" ]] && tickets+=(${$(basename "$d")#tech-})
     done
-    for b in $(git -C "$_SV_LOCAL_REPO" branch --format='%(refname:short)' 2>/dev/null | sed -n 's/^vs-//p'); do
+    for b in $(git -C "$_SV_LOCAL_REPO" branch --format='%(refname:short)' 2>/dev/null | sed -n 's/^tech-//p'); do
       [[ -n "$b" ]] && tickets+=($b)
     done
   fi
