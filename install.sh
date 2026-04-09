@@ -48,6 +48,7 @@ _link "$DOTFILES/pi/agent/AGENTS.md"    ~/.pi/agent/AGENTS.md
 [[ -L ~/.pi/agent/skills ]] && rm ~/.pi/agent/skills
 mkdir -p ~/.pi/agent/skills
 for skill in "$DOTFILES/pi/agent/skills"/*/; do
+  [[ ! -d "$skill" ]] && continue
   _linkd "$skill" ~/.pi/agent/skills/"$(basename "$skill")"
 done
 
