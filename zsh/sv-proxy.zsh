@@ -100,16 +100,19 @@ sv() {
 
   # Classify the command
   local needs_attach=false is_list=false raw_ticket="" skip_next=false
+  local has_destructive=false
   for arg in "$@"; do
     if $skip_next; then skip_next=false; continue; fi
     case "$arg" in
-      --list|-l)                    is_list=true; needs_attach=false; break ;;
-      --shelve|--close)             needs_attach=false ;;
+      --list|-l)                    is_list=true; break ;;
+      --shelve|--close)             has_destructive=true ;;
       --comment)                    skip_next=true ;;
       --*)                          ;;
-      *)                            raw_ticket="$arg"; needs_attach=true ;;
+      *)                            raw_ticket="$arg" ;;
     esac
   done
+  # Attach only when we have a ticket and no destructive flags
+  [[ -n "$raw_ticket" ]] && ! $has_destructive && needs_attach=true
 
   # --- Help: local, no VM needed ---
   for arg in "$@"; do
