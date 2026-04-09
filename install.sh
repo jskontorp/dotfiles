@@ -52,6 +52,42 @@ for skill in "$DOTFILES/pi/agent/skills"/*/; do
   _linkd "$skill" ~/.pi/agent/skills/"$(basename "$skill")"
 done
 
+# --- Marketplace pi skills (from lock file) ---
+SKILL_LOCK="$DOTFILES/pi/skill-lock.json"
+if [[ -f "$SKILL_LOCK" ]]; then
+  mkdir -p ~/.agents/skills
+  cp "$SKILL_LOCK" ~/.agents/.skill-lock.json
+
+  python3 -c "
+import json, os, sys
+with open(sys.argv[1]) as f:
+    data = json.load(f)
+for name, info in data.get('skills', {}).items():
+    skill_dir = os.path.dirname(info['skillPath'])
+    print(f'{name}\\t{info[\"sourceUrl\"]}\\t{skill_dir}')
+" "$SKILL_LOCK" | while IFS=$'\t' read -r name url skill_dir; do
+    [[ -d "$HOME/.agents/skills/$name" ]] && continue
+    echo "Installing pi skill: $name"
+    tmp=$(mktemp -d)
+    if git clone --depth 1 --filter=blob:none --sparse "$url" "$tmp/repo" 2>/dev/null &&
+       (cd "$tmp/repo" && git sparse-checkout set "$skill_dir" 2>/dev/null); then
+      cp -r "$tmp/repo/$skill_dir" "$HOME/.agents/skills/$name"
+    else
+      echo "  ⚠ Failed to install $name" >&2
+    fi
+    rm -rf "$tmp"
+  done
+
+  # Symlink marketplace skills into ~/.pi/agent/skills/
+  for skill in ~/.agents/skills/*/; do
+    [[ ! -d "$skill" ]] && continue
+    name=$(basename "$skill")
+    # Custom skills (already linked above) take precedence
+    [[ -e ~/.pi/agent/skills/"$name" ]] && continue
+    _linkd "$HOME/.agents/skills/$name" ~/.pi/agent/skills/"$name"
+  done
+fi
+
 # bat theme
 mkdir -p "$(bat --config-dir)/themes"
 _link "$DOTFILES/shared/bat/themes/Catppuccin Mocha.tmTheme" "$(bat --config-dir)/themes/"

@@ -1,0 +1,125 @@
+{
+  "version": 3,
+  "skills": {
+    "find-skills": {
+      "source": "vercel-labs/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/vercel-labs/skills.git",
+      "skillPath": "skills/find-skills/SKILL.md",
+      "skillFolderHash": "3013fdeb8a11b10b1eb795ec3ae8bfca38f7c26d",
+      "installedAt": "2026-03-11T08:39:25.536Z",
+      "updatedAt": "2026-04-08T13:41:35.000Z"
+    },
+    "vercel-react-best-practices": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/vercel-labs/agent-skills.git",
+      "skillPath": "skills/react-best-practices/SKILL.md",
+      "skillFolderHash": "a203aee7243640ceb56ce2c6c4ab286573df5e69",
+      "installedAt": "2026-04-08T13:47:13.830Z",
+      "updatedAt": "2026-04-08T13:55:39.223Z"
+    },
+    "web-design-guidelines": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/vercel-labs/agent-skills.git",
+      "skillPath": "skills/web-design-guidelines/SKILL.md",
+      "skillFolderHash": "3116f3e62dbd02b44a598b1aa690d2a8938e8f89",
+      "installedAt": "2026-04-08T13:49:40.428Z",
+      "updatedAt": "2026-04-08T13:49:40.428Z"
+    },
+    "ai-sdk": {
+      "source": "vercel/ai",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/vercel/ai.git",
+      "skillPath": "skills/use-ai-sdk/SKILL.md",
+      "skillFolderHash": "44598b58c18da7265ea6c5a8630563ece3f51ab6",
+      "installedAt": "2026-04-08T13:52:59.078Z",
+      "updatedAt": "2026-04-08T13:52:59.078Z"
+    },
+    "supabase-postgres-best-practices": {
+      "source": "supabase/agent-skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/supabase/agent-skills.git",
+      "skillPath": "skills/supabase-postgres-best-practices/SKILL.md",
+      "skillFolderHash": "9e4dd36978eedd04efc649b4d431ab5ce4bb3896",
+      "pluginName": "postgres-best-practices",
+      "installedAt": "2026-04-08T13:53:27.773Z",
+      "updatedAt": "2026-04-08T13:53:27.773Z"
+    },
+    "nextjs-app-router-patterns": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/wshobson/agents.git",
+      "skillPath": "plugins/frontend-mobile-development/skills/nextjs-app-router-patterns/SKILL.md",
+      "skillFolderHash": "9756cecd3eac4e42a2f09e92859b955b1166b450",
+      "installedAt": "2026-04-08T13:53:52.386Z",
+      "updatedAt": "2026-04-08T13:53:52.386Z"
+    },
+    "systematic-debugging": {
+      "source": "obra/superpowers",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/obra/superpowers.git",
+      "skillPath": "skills/systematic-debugging/SKILL.md",
+      "skillFolderHash": "828c239ac986cc1fc7edd10292f66e4a3640e9c0",
+      "installedAt": "2026-04-09T08:47:22.022Z",
+      "updatedAt": "2026-04-09T08:47:22.022Z"
+    },
+    "webapp-testing": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/anthropics/skills.git",
+      "skillPath": "skills/webapp-testing/SKILL.md",
+      "skillFolderHash": "74cb751576f9e9af2aedff47e67861ef26db2dc4",
+      "pluginName": "example-skills",
+      "installedAt": "2026-04-09T08:47:25.108Z",
+      "updatedAt": "2026-04-09T08:47:25.108Z"
+    },
+    "typescript-advanced-types": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/wshobson/agents.git",
+      "skillPath": "plugins/javascript-typescript/skills/typescript-advanced-types/SKILL.md",
+      "skillFolderHash": "a2fe3beb2f08b66b467981df7e09a2ccc5c9c7d2",
+      "installedAt": "2026-04-09T08:47:27.924Z",
+      "updatedAt": "2026-04-09T08:47:27.924Z"
+    },
+    "deploy-to-vercel": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/vercel-labs/agent-skills.git",
+      "skillPath": "skills/deploy-to-vercel/SKILL.md",
+      "skillFolderHash": "1378aa506439f26c809dbcfc61515cbd70f93d69",
+      "installedAt": "2026-04-09T08:47:29.669Z",
+      "updatedAt": "2026-04-09T08:47:29.669Z"
+    },
+    "accessibility": {
+      "source": "addyosmani/web-quality-skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/addyosmani/web-quality-skills.git",
+      "skillPath": "skills/accessibility/SKILL.md",
+      "skillFolderHash": "610035b217cff3f6e63b4d9edfe1e113ecebf5f6",
+      "installedAt": "2026-04-09T08:50:47.269Z",
+      "updatedAt": "2026-04-09T08:50:47.269Z"
+    }
+  },
+  "dismissed": {
+    "findSkillsPrompt": true
+  },
+  "lastSelectedAgents": [
+    "amp",
+    "antigravity",
+    "cline",
+    "codex",
+    "cursor",
+    "deepagents",
+    "firebender",
+    "gemini-cli",
+    "github-copilot",
+    "kimi-cli",
+    "opencode",
+    "warp",
+    "pi",
+    "claude-code"
+  ]
+}
