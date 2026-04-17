@@ -45,6 +45,7 @@ _link "$DOTFILES/shared/gitconfig"      ~/.gitconfig
 _linkd "$DOTFILES/shared/nvim"          ~/.config/nvim
 _link "$DOTFILES/pi/agent/AGENTS.md"    ~/.pi/agent/AGENTS.md
 _link "$DOTFILES/pi/agent/settings.json" ~/.pi/agent/settings.json
+_link "$DOTFILES/pi/agent/models.json"   ~/.pi/agent/models.json
 # Replace old whole-directory symlink with a real directory
 [[ -L ~/.pi/agent/skills ]] && rm ~/.pi/agent/skills
 mkdir -p ~/.pi/agent/skills
