@@ -7,6 +7,13 @@ DOTFILES := justfile_directory()
 MAC      := DOTFILES / "machine/mac"
 VM       := DOTFILES / "machine/vm"
 
+# Global pnpm packages — shared across mac and vm update recipes
+GLOBAL_PNPM := "@anthropic-ai/claude-code @mariozechner/pi-coding-agent"
+
+# Tools that both platforms must report in `just status`.
+# Platform-specific tools (brew, fnm, docker, etc.) are added per-recipe.
+SHARED_STATUS_TOOLS := "zsh nvim tmux node pnpm git gh delta starship eza bat rg fzf zoxide lazygit pi claude"
+
 # --- Setup ---
 
 # Full bootstrap (fresh machine)
@@ -25,6 +32,8 @@ update:
     set -euo pipefail
     echo "📦 Homebrew..."
     brew update && brew bundle --file="{{MAC}}/Brewfile" && brew upgrade && brew cleanup
+    echo "📦 global pnpm packages..."
+    pnpm add -g {{GLOBAL_PNPM}}
     echo "📦 tmux plugins..."
     "$HOME/.tmux/plugins/tpm/bin/install_plugins"
     echo "✅ Done"
@@ -142,7 +151,7 @@ update:
     export PATH="$PNPM_HOME:$PATH"
     curl -fsSL https://get.pnpm.io/install.sh | SHELL=/bin/bash sh -
     echo "📦 global pnpm packages..."
-    pnpm add -g @anthropic-ai/claude-code @mariozechner/pi-coding-agent
+    pnpm add -g {{GLOBAL_PNPM}}
 
     echo "📦 tmux plugins..."
     "$HOME/.tmux/plugins/tpm/bin/install_plugins"
@@ -175,6 +184,8 @@ status:
     printf "%-12s %s\n" "fd"       "$(fd --version | awk '{print $2}')"
     printf "%-12s %s\n" "zoxide"   "$(zoxide --version 2>/dev/null | awk '{print $2}' || echo 'missing')"
     printf "%-12s %s\n" "lazygit"  "$(lazygit --version | head -1 | sed 's/.*version=//' | cut -d, -f1)"
+    printf "%-12s %s\n" "pi"       "$(command -v pi &>/dev/null && pi --version 2>&1 | awk '{print $NF}' || echo 'missing')"
+    printf "%-12s %s\n" "claude"   "$(command -v claude &>/dev/null && claude --version 2>&1 | awk '{print $1}' || echo 'missing')"
 
 [linux]
 status:
@@ -202,8 +213,8 @@ status:
     printf "%-12s %s\n" "fnm"      "$(fnm --version 2>/dev/null | awk '{print $2}' || echo 'missing')"
     printf "%-12s %s\n" "just"     "$(just --version 2>/dev/null | awk '{print $2}' || echo 'missing')"
     printf "%-12s %s\n" "docker"   "$(docker --version 2>/dev/null | awk '{print $3}' | tr -d ',' || echo 'missing')"
-    printf "%-12s %s\n" "pi"       "$(pi --version 2>/dev/null | awk '{print $NF}' || echo 'missing')"
-    printf "%-12s %s\n" "claude"   "$(claude --version 2>/dev/null | awk '{print $1}' || echo 'missing')"
+    printf "%-12s %s\n" "pi"       "$(command -v pi &>/dev/null && pi --version 2>&1 | awk '{print $NF}' || echo 'missing')"
+    printf "%-12s %s\n" "claude"   "$(command -v claude &>/dev/null && claude --version 2>&1 | awk '{print $1}' || echo 'missing')"
 
 # --- Management ---
 
