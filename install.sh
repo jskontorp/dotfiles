@@ -52,6 +52,15 @@ for skill in "$DOTFILES/pi/agent/skills"/*/; do
   _linkd "$skill" ~/.pi/agent/skills/"$(basename "$skill")"
 done
 
+# pi extensions: symlink each .ts file into ~/.pi/agent/extensions/
+if [[ -d "$DOTFILES/pi/agent/extensions" ]]; then
+  mkdir -p ~/.pi/agent/extensions
+  for ext in "$DOTFILES/pi/agent/extensions"/*.ts; do
+    [[ ! -f "$ext" ]] && continue
+    _link "$ext" ~/.pi/agent/extensions/"$(basename "$ext")"
+  done
+fi
+
 # --- Marketplace pi skills (from lock file) ---
 SKILL_LOCK="$DOTFILES/pi/skill-lock.json"
 if [[ -f "$SKILL_LOCK" ]]; then
