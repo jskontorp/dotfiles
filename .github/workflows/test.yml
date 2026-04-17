@@ -12,7 +12,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: shellcheck
-        run: shellcheck install.sh init.sh machine/mac/bootstrap.sh machine/vm/bootstrap.sh test/verify.sh test/validate-manifest.sh
+        run: shellcheck install.sh init.sh machine/mac/bootstrap.sh machine/vm/bootstrap.sh test/verify.sh test/validate-manifest.sh test/check-justfile.sh
+
+  justfile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: extractions/setup-just@v2
+      - name: justfile checks
+        run: bash test/check-justfile.sh
 
   docker-test:
     runs-on: ubuntu-latest
