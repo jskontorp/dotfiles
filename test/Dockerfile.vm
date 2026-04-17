@@ -2,7 +2,7 @@ FROM ubuntu:22.04
 
 # Minimal deps matching the Oracle VM environment
 RUN apt-get update -qq && apt-get install -y -qq \
-    zsh git curl sudo \
+    zsh git curl sudo python3 \
     && rm -rf /var/lib/apt/lists/*
 
 # Non-root user with sudo

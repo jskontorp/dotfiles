@@ -3,7 +3,7 @@ FROM ubuntu:22.04
 # macOS can't be containerized, so we simulate the mac path
 # by setting uname to Darwin via a wrapper
 RUN apt-get update -qq && apt-get install -y -qq \
-    zsh git curl sudo \
+    zsh git curl sudo python3 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN useradd -m -s /bin/zsh testuser \
