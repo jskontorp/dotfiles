@@ -115,6 +115,8 @@ run_test() {
     'dexec bash -c "! grep -q \"Load skills when\" ~/.pi/agent/skills/solve-ticket/SKILL.md"'
   check "AGENTS.md contains NAJA"          'dexec grep -q NAJA /home/testuser/.pi/agent/AGENTS.md'
   check "at least 5 skill symlinks"        'dexec bash -c "[[ \$(find ~/.pi/agent/skills -maxdepth 1 -type l | wc -l) -ge 5 ]]"'
+  check "settings.json lists pi-linear-tools package" \
+    'dexec grep -q "@fink-andreas/pi-linear-tools" /home/testuser/.pi/agent/settings.json'
 
   # --- Shell behaviour ---
   printf "\nShell behaviour:\n"
