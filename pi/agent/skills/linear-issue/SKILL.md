@@ -10,10 +10,13 @@ description: >-
 
 # Linear issue (draft → confirm → create)
 
-A confirm gate wraps every write action on the `linear_*` tools. Produce a
-clean draft on the first call; the user sees a preview and picks
-`go` / `revise` / `cancel`. If they pick `revise`, the tool call is blocked
-with their feedback as the reason — redraft from that feedback and call again.
+A confirm gate wraps write actions on the `linear_*` tools (create, update,
+delete, archive, unarchive). `comment` and `start` skip the gate — comments
+are short and frequent, `start` just moves state to In Progress. Produce a
+clean draft on the first call; the user sees a preview and picks the action
+button (e.g. `create`) / `revise` / `cancel`. If they pick `revise`, the tool
+call is blocked with their feedback as the reason — redraft from that
+feedback and call again.
 
 ## Draft
 
@@ -63,7 +66,7 @@ extension renders a markdown preview and prompts the user.
 
 ## Handle the result
 
-- **`go`** → issue is created. Report the issue key + URL, nothing else.
+- **Action button (e.g. `create`)** → issue is created. Report the issue key + URL, nothing else.
 - **`revise`** → the tool call is blocked with a reason starting with
   `User requested changes` and containing the user's feedback. Apply the
   feedback, call `linear_issue create` again. The gate will show the new
