@@ -64,6 +64,16 @@
       "skillFolderHash": "610035b217cff3f6e63b4d9edfe1e113ecebf5f6",
       "installedAt": "2026-04-09T08:50:47.269Z",
       "updatedAt": "2026-04-09T08:50:47.269Z"
+    },
+    "neon-postgres": {
+      "source": "neondatabase/agent-skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/neondatabase/agent-skills",
+      "skillPath": "skills/neon-postgres/SKILL.md",
+      "skillFolderHash": "38c7da85db656c8c9efd1e6433c200212926fd2d",
+      "installedAt": "2026-04-21T11:19:03.000Z",
+      "updatedAt": "2026-04-21T11:19:03.000Z",
+      "scope": "project:volve-ai"
     }
   },
   "dismissed": {
