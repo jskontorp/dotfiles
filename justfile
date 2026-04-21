@@ -222,6 +222,71 @@ status:
 link:
     {{DOTFILES}}/install.sh
 
+# Show unified pi skill inventory: name, scope, source, description
+skills:
+    #!/usr/bin/env python3
+    import json, re, sys
+    from pathlib import Path
+
+    DOTFILES = Path("{{DOTFILES}}")
+    entries = []
+
+    def description(skill_md):
+        if not skill_md.exists():
+            return ""
+        text = skill_md.read_text()
+        m = re.search(r"^---\n(.*?)\n---", text, re.DOTALL)
+        if not m:
+            return ""
+        try:
+            import yaml
+            data = yaml.safe_load(m.group(1)) or {}
+            desc = str(data.get("description", ""))
+        except Exception:
+            desc = ""
+            for line in m.group(1).splitlines():
+                if line.startswith("description:"):
+                    desc = line.split(":", 1)[1].strip().strip('"').strip("'")
+                    break
+        return " ".join(desc.split())
+
+    for d in sorted((DOTFILES / "pi/agent/skills").iterdir()):
+        if d.is_dir():
+            entries.append((d.name, "global", "local", description(d / "SKILL.md")))
+
+    lock = DOTFILES / "pi/skill-lock.json"
+    if lock.exists():
+        data = json.loads(lock.read_text())
+        for name in sorted(data.get("skills", {})):
+            installed = Path.home() / ".agents/skills" / name / "SKILL.md"
+            entries.append((name, "global", "github", description(installed)))
+
+    projects_dir = DOTFILES / "projects"
+    if projects_dir.exists():
+        for proj in sorted(projects_dir.iterdir()):
+            if not proj.is_dir():
+                continue
+            skills_dir = proj / "skills"
+            if skills_dir.exists():
+                for s in sorted(skills_dir.iterdir()):
+                    if s.is_dir():
+                        entries.append((s.name, f"project:{proj.name}", "local", description(s / "SKILL.md")))
+
+    if not entries:
+        print("(no skills found)")
+        sys.exit(0)
+
+    max_name = max(len(e[0]) for e in entries)
+    max_scope = max(len(e[1]) for e in entries)
+    header = f"{'NAME':<{max_name}}  {'SCOPE':<{max_scope}}  {'SOURCE':<7}  DESCRIPTION"
+    print(header)
+    print("-" * len(header))
+    desc_width = max(20, 100 - max_name - max_scope - 7 - 6)
+    for name, scope, source, desc in entries:
+        if len(desc) > desc_width:
+            desc = desc[:desc_width - 1] + "\u2026"
+        print(f"{name:<{max_name}}  {scope:<{max_scope}}  {source:<7}  {desc}")
+
 # Run install validation in Docker
 test target="both":
     {{DOTFILES}}/test/verify.sh {{target}}
