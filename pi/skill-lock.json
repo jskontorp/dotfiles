@@ -74,6 +74,30 @@
       "installedAt": "2026-04-21T11:19:03.000Z",
       "updatedAt": "2026-04-21T11:19:03.000Z",
       "scope": "project:volve-ai"
+    },
+    "frontend-design": {
+      "source": "mager/frontend-design",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/mager/frontend-design",
+      "skillPath": "./SKILL.md",
+      "skillFolderHash": "ffa6526da86ca8d5b5441311b22a3bf09be7439b",
+      "scope": "project:micio"
+    },
+    "tailwind-4": {
+      "source": "prowler-cloud/prowler",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/prowler-cloud/prowler",
+      "skillPath": "skills/tailwind-4/SKILL.md",
+      "skillFolderHash": "570c86948eb08c033e6ac76eed36817af87cfa31",
+      "scope": "project:micio"
+    },
+    "shadcn": {
+      "source": "shadcn/ui",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/shadcn/ui",
+      "skillPath": "skills/shadcn/SKILL.md",
+      "skillFolderHash": "11cbc3284033182b7e1e632b82e48bdc575d2a0a",
+      "scope": "project:micio"
     }
   },
   "dismissed": {
