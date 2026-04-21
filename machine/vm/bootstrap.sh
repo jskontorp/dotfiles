@@ -19,11 +19,12 @@ export PATH="$HOME/.local/bin:$PATH"
 sudo apt-get update -qq
 sudo apt-get install -y -qq \
   zsh git gh curl wget unzip jq fzf \
-  ripgrep fd-find \
+  ripgrep fd-find bat \
   fail2ban \
   build-essential
 
 sudo ln -sf "$(which fdfind)" /usr/local/bin/fd 2>/dev/null || true
+sudo ln -sf "$(which batcat)" /usr/local/bin/bat 2>/dev/null || true
 
 # --- Swap (4GB, skip if exists) ---
 if ! swapon --show | grep -q swapfile; then

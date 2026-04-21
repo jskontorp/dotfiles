@@ -48,10 +48,11 @@ update:
     sudo apt-get update -qq && sudo apt-get upgrade -y -qq
     sudo apt-get install -y -qq \
       zsh git gh curl wget unzip jq fzf \
-      ripgrep fd-find \
+      ripgrep fd-find bat \
       build-essential
     sudo apt-get autoremove -y -qq
     sudo ln -sf "$(which fdfind)" /usr/local/bin/fd 2>/dev/null || true
+    sudo ln -sf "$(which batcat)" /usr/local/bin/bat 2>/dev/null || true
 
     echo "📦 zsh plugins..."
     ZSH_PLUGINS="$HOME/.local/share/zsh/plugins"
