@@ -3,19 +3,21 @@ set -euo pipefail
 
 # sandbox-up.sh — Start a Docker container + tmux session
 #
-# Usage: sandbox-up.sh [--image IMAGE] [--mount PATH] [--rw] [--name NAME]
+# Usage: sandbox-up.sh [--image IMAGE] [--mount PATH] [--rw] [--name NAME] [--workdir PATH]
 
 IMAGE="ubuntu:latest"
 MOUNT_PATH="$(pwd)"
 MOUNT_MODE="ro"
 NAME="pi-sandbox"
+WORKDIR="/workspace"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --image)  IMAGE="$2";      shift 2 ;;
-    --mount)  MOUNT_PATH="$2"; shift 2 ;;
-    --rw)     MOUNT_MODE="rw";  shift ;;
-    --name)   NAME="$2";       shift 2 ;;
+    --image)   IMAGE="$2";      shift 2 ;;
+    --mount)   MOUNT_PATH="$2"; shift 2 ;;
+    --rw)      MOUNT_MODE="rw";  shift ;;
+    --name)    NAME="$2";       shift 2 ;;
+    --workdir) WORKDIR="$2";    shift 2 ;;
     *) echo "Unknown flag: $1" >&2; exit 1 ;;
   esac
 done
@@ -46,8 +48,8 @@ done
 DOCKER_ARGS=(
   run -d
   --name "$NAME"
-  -v "$MOUNT_PATH:/workspace:$MOUNT_MODE"
-  -w /workspace
+  -v "$MOUNT_PATH:$WORKDIR:$MOUNT_MODE"
+  -w "$WORKDIR"
 )
 
 # Allow extra docker args via env var
@@ -60,7 +62,7 @@ DOCKER_ARGS+=("$IMAGE" sleep infinity)
 
 $RUNTIME "${DOCKER_ARGS[@]}" >/dev/null
 
-echo "Container '$NAME' started (image: $IMAGE, mount: $MOUNT_PATH [$MOUNT_MODE])"
+echo "Container '$NAME' started (image: $IMAGE, mount: $MOUNT_PATH → $WORKDIR [$MOUNT_MODE])"
 
 # Create tmux session and attach to container shell
 tmux new-session -d -s "$NAME" -x 220 -y 50

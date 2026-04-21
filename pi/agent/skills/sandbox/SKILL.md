@@ -39,15 +39,16 @@ Ask the user if ambiguous.
 ### 2. Start
 
 ```bash
-./scripts/sandbox-up.sh [--image <image>] [--mount <host-path>] [--rw] [--name <name>]
+./scripts/sandbox-up.sh [--image <image>] [--mount <host-path>] [--rw] [--name <name>] [--workdir <container-path>]
 ```
 
 | Flag | Default | Purpose |
 |------|---------|---------|
 | `--image` | `ubuntu:latest` | Container image |
-| `--mount` | cwd | Host dir → `/workspace` |
+| `--mount` | cwd | Host dir to mount |
 | `--rw` | off | Mount read-write |
 | `--name` | `pi-sandbox` | Container + tmux session name |
+| `--workdir` | `/workspace` | Mount point + working dir inside container (override for images that expect `/app`, `/src`, etc.) |
 
 On name collision, the script appends a suffix (`pi-sandbox-2`, …) and prints `SANDBOX_NAME=<actual>`. **Parse and use the actual name for all subsequent calls.**
 
@@ -88,8 +89,8 @@ Last `n` lines from the tmux pane (default: 100). Use to poll servers or read sc
 When tmux is unavailable. The user loses live observability.
 
 ```bash
-# Start
-docker run -d --name pi-sandbox -v "$(pwd):/workspace:ro" <image> sleep infinity
+# Start (override the container path if the image expects something other than /workspace)
+docker run -d --name pi-sandbox -v "$(pwd):/workspace:ro" -w /workspace <image> sleep infinity
 
 # Run
 docker exec pi-sandbox <command>
