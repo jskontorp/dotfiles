@@ -47,6 +47,18 @@ just update    # upgrade packages + install new additions (hits network)
 | `just git` | `~/.gitconfig` |
 | `just ghostty` | Ghostty config (macOS only) |
 
+**Pi skill management:**
+
+| Command | What it does |
+| --- | --- |
+| `just skills` | Show unified skill inventory (name / scope / source / description) |
+| `just new-skill <name>` | Scaffold a local global skill |
+| `just edit-skill <name>` | Open an existing skill in `$EDITOR` |
+| `just add-skill <url> <name> [subpath] [scope] [rev] [dry-run]` | Install a marketplace skill from GitHub; optional `project:<name>` scope |
+| `just update-skill <name>` | Bump a marketplace skill's pinned SHA to upstream HEAD |
+
+See `pi/agent/AGENTS.md` for the authoritative routing rules (what goes where). Project-scoped skills are resolved via `projects.conf`.
+
 ## Structure
 
 ```

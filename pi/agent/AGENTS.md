@@ -52,6 +52,11 @@ This file is symlinked from `~/code/personal/dotfiles/pi/agent/AGENTS.md`. Skill
 - Global extension → `dotfiles/pi/agent/extensions/<name>.ts`
 - Inventory overview: `just skills`.
 
-Run `just link` after mutating changes. Use `just new-skill <name>` to scaffold and `just edit-skill <name>` to open an existing skill regardless of cwd.
+Run `just link` after mutating changes. Skill management commands (all work regardless of cwd):
+- `just skills` — unified inventory table.
+- `just new-skill <name>` — scaffold a local global skill.
+- `just edit-skill <name>` — open an existing skill in `$EDITOR`.
+- `just add-skill <url> <name> [subpath] [scope] [rev] [dry-run]` — add a marketplace skill; scope defaults to `global`, use `project:<name>` for per-repo; pass `rev` to pin an explicit SHA; pass `dry-run` as the 6th arg to preview.
+- `just update-skill <name>` — bump a marketplace skill's pinned SHA to upstream HEAD.
 
 > **Revisit this layout** when `just skills` shows ≥25 entries, or by 2026-06-01, whichever comes first. If LLM authoring has produced misplaced skills or the `scope` field feels under-expressive, consider unifying skills + marketplace under a single manifest (see dotfiles history for prior design sketches).
