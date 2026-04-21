@@ -53,3 +53,5 @@ This file is symlinked from `~/code/personal/dotfiles/pi/agent/AGENTS.md`. Skill
 - Inventory overview: `just skills`.
 
 Run `just link` after mutating changes. Use `just new-skill <name>` to scaffold and `just edit-skill <name>` to open an existing skill regardless of cwd.
+
+> **Revisit this layout** when `just skills` shows ≥25 entries, or by 2026-06-01, whichever comes first. If LLM authoring has produced misplaced skills or the `scope` field feels under-expressive, consider unifying skills + marketplace under a single manifest (see dotfiles history for prior design sketches).
