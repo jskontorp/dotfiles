@@ -41,7 +41,9 @@ M="$DOTFILES/machine/$MACHINE"
 # --- Shared configs ---
 mkdir -p ~/.config ~/.config/zsh ~/.pi/agent
 
-_link "$DOTFILES/shared/gitconfig"      ~/.gitconfig
+_link "$DOTFILES/shared/gitconfig"         ~/.gitconfig
+mkdir -p ~/.config/git
+_link "$DOTFILES/shared/gitignore_global" ~/.config/git/ignore
 _linkd "$DOTFILES/shared/nvim"          ~/.config/nvim
 _link "$DOTFILES/pi/agent/AGENTS.md"    ~/.pi/agent/AGENTS.md
 _link "$DOTFILES/pi/agent/settings.json" ~/.pi/agent/settings.json
