@@ -54,7 +54,7 @@ This file is symlinked from `~/code/personal/dotfiles/pi/agent/AGENTS.md`. Skill
 
 Run `just link` after mutating changes. Skill management commands (all work regardless of cwd):
 - `just skills` — unified inventory table.
-- `just new-skill <name>` — scaffold a local global skill.
+- `just new-skill <name>` — scaffold a custom global skill (authored locally, tracked in dotfiles).
 - `just edit-skill <name>` — open an existing skill in `$EDITOR`.
 - `just add-skill <url> <name> [subpath] [scope] [rev] [dry-run]` — add a marketplace skill; scope defaults to `global`, use `project:<name>` for per-repo; pass `rev` to pin an explicit SHA; pass `dry-run` as the 6th arg to preview.
 - `just update-skill <name>` — bump a marketplace skill's pinned SHA to upstream HEAD.

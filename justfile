@@ -324,7 +324,7 @@ git:
 ghostty:
     nvim "$HOME/Library/Application Support/com.mitchellh.ghostty/config"
 
-# Scaffold a new custom global pi skill and remind to run `just link`
+# Scaffold a new custom global skill (authored locally, tracked in dotfiles)
 [group('edit')]
 new-skill name:
     #!/usr/bin/env bash
