@@ -65,9 +65,22 @@ fi
 
 # --- Marketplace pi skills (from lock file) ---
 SKILL_LOCK="$DOTFILES/pi/skill-lock.json"
+SKILL_CACHE="$HOME/.local/share/pi-skills"
 if [[ -f "$SKILL_LOCK" ]]; then
-  mkdir -p ~/.agents/skills
-  cp "$SKILL_LOCK" ~/.agents/.skill-lock.json
+  mkdir -p "$SKILL_CACHE"
+
+  # One-time migration from old cache at ~/.agents/skills/ (was in pi's global
+  # scan path, caused project-scoped skills to leak globally).
+  if [[ -d "$HOME/.agents/skills" ]]; then
+    for d in "$HOME/.agents/skills"/*/; do
+      [[ ! -d "$d" ]] && continue
+      base=$(basename "$d")
+      [[ -d "$SKILL_CACHE/$base" ]] || mv "$d" "$SKILL_CACHE/$base"
+    done
+    rm -f "$HOME/.agents/.skill-lock.json"
+    rmdir "$HOME/.agents/skills" 2>/dev/null || true
+    rmdir "$HOME/.agents" 2>/dev/null || true
+  fi
 
   python3 -c "
 import json, os, sys
@@ -77,25 +90,62 @@ for name, info in data.get('skills', {}).items():
     skill_dir = os.path.dirname(info['skillPath'])
     print(f'{name}\\t{info[\"sourceUrl\"]}\\t{skill_dir}')
 " "$SKILL_LOCK" | while IFS=$'\t' read -r name url skill_dir; do
-    [[ -d "$HOME/.agents/skills/$name" ]] && continue
+    [[ -d "$SKILL_CACHE/$name" ]] && continue
     echo "Installing pi skill: $name"
     tmp=$(mktemp -d)
     if git clone --depth 1 --filter=blob:none --sparse "$url" "$tmp/repo" 2>/dev/null &&
        (cd "$tmp/repo" && git sparse-checkout set "$skill_dir" 2>/dev/null); then
-      cp -r "$tmp/repo/$skill_dir" "$HOME/.agents/skills/$name"
+      cp -r "$tmp/repo/$skill_dir" "$SKILL_CACHE/$name"
     else
       echo "  ⚠ Failed to install $name" >&2
     fi
     rm -rf "$tmp"
   done
 
-  # Symlink marketplace skills into ~/.pi/agent/skills/
-  for skill in ~/.agents/skills/*/; do
-    [[ ! -d "$skill" ]] && continue
-    name=$(basename "$skill")
-    # Custom skills (already linked above) take precedence
-    [[ -e ~/.pi/agent/skills/"$name" ]] && continue
-    _linkd "$HOME/.agents/skills/$name" ~/.pi/agent/skills/"$name"
+  # Symlink marketplace skills. `scope` field (optional per entry) is either
+  # "global" (default → ~/.pi/agent/skills/<name>) or "project:<name>" →
+  # resolves via projects.conf and symlinks into <repo>/.pi/skills/<name>.
+  python3 -c "
+import json, sys
+with open(sys.argv[1]) as f:
+    data = json.load(f)
+for name, info in data.get('skills', {}).items():
+    print(f'{name}\t{info.get(\"scope\", \"global\")}')
+" "$SKILL_LOCK" | while IFS=$'\t' read -r name scope; do
+    content="$SKILL_CACHE/$name"
+    [[ ! -d "$content" ]] && continue
+    if [[ "$scope" == "global" ]]; then
+      # Custom skills (already linked above) take precedence
+      [[ -e ~/.pi/agent/skills/"$name" ]] && continue
+      _linkd "$content" ~/.pi/agent/skills/"$name"
+    elif [[ "$scope" == project:* ]]; then
+      proj="${scope#project:}"
+      repo=""
+      if [[ -f "$DOTFILES/projects.conf" ]]; then
+        while IFS= read -r line; do
+          [[ "$line" =~ ^[[:space:]]*# ]] && continue
+          [[ -z "${line// /}" ]] && continue
+          read -r p_name p_path <<< "$line"
+          [[ "$p_name" != "$proj" ]] && continue
+          p_path="${p_path/#\~/$HOME}"
+          if [[ -d "$p_path/.git" ]]; then
+            repo="$p_path"
+            break
+          fi
+        done < "$DOTFILES/projects.conf"
+      fi
+      if [[ -z "$repo" ]]; then
+        echo "  ⚠ Scope project:$proj for $name: project not found in projects.conf or not checked out, skipping" >&2
+        continue
+      fi
+      mkdir -p "$repo/.pi/skills"
+      target="$repo/.pi/skills/$name"
+      # If global symlink exists (e.g., scope was just changed from global), remove it
+      [[ -L ~/.pi/agent/skills/"$name" ]] && rm ~/.pi/agent/skills/"$name"
+      _linkd "$content" "$target"
+    else
+      echo "  ⚠ Skill $name has unknown scope '$scope', skipping" >&2
+    fi
   done
 
   # Prune marketplace skills no longer in the lock file
@@ -105,7 +155,7 @@ with open(sys.argv[1]) as f:
     data = json.load(f)
 print('\n'.join(data.get('skills', {}).keys()))
 " "$SKILL_LOCK")
-  for skill_dir in ~/.agents/skills/*/; do
+  for skill_dir in "$SKILL_CACHE"/*/; do
     [[ ! -d "$skill_dir" ]] && continue
     name=$(basename "$skill_dir")
     if ! echo "$lock_names" | grep -qx "$name"; then

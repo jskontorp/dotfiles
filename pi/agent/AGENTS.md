@@ -47,7 +47,7 @@ Do not edit, write, or execute commands. Reading files to inform the answer is f
 This file is symlinked from `~/code/personal/dotfiles/pi/agent/AGENTS.md`. Skills and extensions that travel across machines are tracked in that repo:
 
 - Custom global skill you authored → `dotfiles/pi/agent/skills/<name>/`
-- Marketplace skill from a GitHub repo → add entry to `dotfiles/pi/skill-lock.json`
+- Marketplace skill from a GitHub repo → `just add-skill <url> <name> [subpath] [scope]`, or hand-edit `dotfiles/pi/skill-lock.json`. Entries support optional `scope: "project:<name>"` to symlink into that project's repo only.
 - Skill needed in only one project → `dotfiles/projects/<repo>/skills/<name>/` (repo mapped via `projects.conf`)
 - Global extension → `dotfiles/pi/agent/extensions/<name>.ts`
 - Inventory overview: `just skills`.

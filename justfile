@@ -260,8 +260,10 @@ skills:
     if lock.exists():
         data = json.loads(lock.read_text())
         for name in sorted(data.get("skills", {})):
-            installed = Path.home() / ".agents/skills" / name / "SKILL.md"
-            entries.append((name, "global", "github", description(installed)))
+            info = data["skills"][name]
+            scope = info.get("scope", "global")
+            installed = Path.home() / ".local/share/pi-skills" / name / "SKILL.md"
+            entries.append((name, scope, "github", description(installed)))
 
     projects_dir = DOTFILES / "projects"
     if projects_dir.exists():
@@ -348,6 +350,59 @@ new-skill name:
     echo "created $dir/SKILL.md"
     echo "next: fill in the description, then run \`just link\`"
     ${EDITOR:-nvim} "$dir/SKILL.md"
+
+# Add a marketplace skill to pi/skill-lock.json. Fetches HEAD SHA, appends entry, runs `just link`.
+# Usage: just add-skill <url> <name> [skill-subpath] [scope]
+# Examples:
+#   just add-skill https://github.com/vercel-labs/skills find-skills
+#   just add-skill https://github.com/neondatabase/agent-skills neon-postgres skills/neon-postgres project:volve-ai
+[group('edit')]
+add-skill url name subpath="" scope="global":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    name="{{name}}"
+    [[ "$name" =~ ^[a-zA-Z0-9_-]+$ ]] || { echo "error: invalid skill name '$name' (use a-zA-Z0-9_-)" >&2; exit 1; }
+    url="{{url}}"
+    subpath="{{subpath}}"
+    scope="{{scope}}"
+    [[ -z "$subpath" ]] && subpath="skills/$name"
+    # skill-lock.json stores skillPath including trailing SKILL.md
+    skill_path="${subpath%/SKILL.md}/SKILL.md"
+    lock="{{DOTFILES}}/pi/skill-lock.json"
+    # Resolve upstream HEAD SHA
+    echo "Resolving HEAD SHA of $url ..."
+    rev=$(git ls-remote "$url" HEAD | awk '{print $1}')
+    [[ -z "$rev" ]] && { echo "error: failed to resolve HEAD SHA for $url" >&2; exit 1; }
+    echo "  rev: $rev"
+    # Append entry via python + json (preserves structure)
+    python3 - "$lock" "$name" "$url" "$skill_path" "$rev" "$scope" <<'PYEOF'
+    import json, sys, datetime
+    lock_path, name, url, skill_path, rev, scope = sys.argv[1:7]
+    with open(lock_path) as f:
+        data = json.load(f)
+    if name in data.get("skills", {}):
+        print(f"error: skill '{name}' already in lock file", file=sys.stderr)
+        sys.exit(1)
+    now = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    entry = {
+        "source": url.replace("https://github.com/", "").replace(".git", ""),
+        "sourceType": "github",
+        "sourceUrl": url,
+        "skillPath": skill_path,
+        "skillFolderHash": rev,
+        "installedAt": now,
+        "updatedAt": now,
+    }
+    if scope != "global":
+        entry["scope"] = scope
+    data.setdefault("skills", {})[name] = entry
+    with open(lock_path, "w") as f:
+        json.dump(data, f, indent=2)
+        f.write("\n")
+    print(f"added '{name}' to {lock_path}")
+    PYEOF
+    echo "running just link ..."
+    {{DOTFILES}}/install.sh
 
 # Open an existing pi skill's SKILL.md in $EDITOR, regardless of cwd
 [group('edit')]
