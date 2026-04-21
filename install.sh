@@ -174,7 +174,9 @@ for name, info in data.get('skills', {}).items():
     fi
 
     # Create the symlink at the desired location.
-    [[ -n "$desired" ]] && _linkd "$content" "$desired"
+    if [[ -n "$desired" ]]; then
+      _linkd "$content" "$desired"
+    fi
   done
 
   # Prune marketplace skills no longer in the lock file
