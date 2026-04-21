@@ -12,10 +12,11 @@ description: >-
 # Notion writes (draft → confirm → execute)
 
 The `notion-routing.ts` extension wraps every Notion write (`notion-create-*`,
-`notion-update-*`, `notion-move-*`, and duplicates except `notion-duplicate-page`)
-with a preview + confirm gate. Reads (`notion-search`, `notion-fetch`,
-`notion-query-*`, `notion-get-comments`) pass through.
-`notion-create-comment` and `notion-duplicate-page` are deliberately ungated.
+`notion-update-*`, `notion-move-*`, `notion-duplicate-*`) with a preview +
+confirm gate, except `notion-create-comment` and `notion-duplicate-page`,
+which are deliberately ungated (short/frequent and sibling-only-trivial-to-
+trash, respectively). Reads (`notion-search`, `notion-fetch`, `notion-query-*`,
+`notion-get-comments`) pass through.
 
 Your job: produce a clean draft on the first call. The user sees a markdown
 preview and picks the action button (e.g. `create pages`) / `revise` /
