@@ -17,8 +17,10 @@ Catch everything an automated reviewer would flag — in one pass, before pushin
 Every bash block:
 
 ```bash
-BASE="main"
+BASE="$(gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name' 2>/dev/null || echo main)"
 ```
+
+Override with `BASE=<branch>` if the PR targets something other than the repo default (e.g. a long-lived release branch).
 
 ## Phase 0 — Gate
 
