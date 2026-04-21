@@ -250,9 +250,11 @@ skills:
                     break
         return " ".join(desc.split())
 
-    for d in sorted((DOTFILES / "pi/agent/skills").iterdir()):
-        if d.is_dir():
-            entries.append((d.name, "global", "local", description(d / "SKILL.md")))
+    custom_dir = DOTFILES / "pi/agent/skills"
+    if custom_dir.exists():
+        for d in sorted(custom_dir.iterdir()):
+            if d.is_dir():
+                entries.append((d.name, "global", "local", description(d / "SKILL.md")))
 
     lock = DOTFILES / "pi/skill-lock.json"
     if lock.exists():
@@ -286,6 +288,8 @@ skills:
         if len(desc) > desc_width:
             desc = desc[:desc_width - 1] + "\u2026"
         print(f"{name:<{max_name}}  {scope:<{max_scope}}  {source:<7}  {desc}")
+    print()
+    print(f"({len(entries)} skills tracked by dotfiles. Pi sessions also load skills shipped by installed pi packages, e.g. setup-oauth + workspace-explorer from @feniix/pi-notion.)")
 
 # Run install validation in Docker
 test target="both":

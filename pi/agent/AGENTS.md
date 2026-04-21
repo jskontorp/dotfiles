@@ -50,5 +50,6 @@ This file is symlinked from `~/code/personal/dotfiles/pi/agent/AGENTS.md`. Skill
 - Marketplace skill from a GitHub repo → add entry to `dotfiles/pi/skill-lock.json`
 - Skill needed in only one project → `dotfiles/projects/<repo>/skills/<name>/` (repo mapped via `projects.conf`)
 - Global extension → `dotfiles/pi/agent/extensions/<name>.ts`
+- Inventory overview: `just skills`.
 
-Run `just link` after changes. Use `just new-skill <name>` to scaffold and `just edit-skill <name>` to open an existing skill regardless of cwd. Use `just skills` for an inventory overview.
+Run `just link` after mutating changes. Use `just new-skill <name>` to scaffold and `just edit-skill <name>` to open an existing skill regardless of cwd.
