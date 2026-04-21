@@ -128,6 +128,7 @@ _link "$DOTFILES/zsh/core.zsh"          ~/.config/zsh/
 _link "$DOTFILES/zsh/git-aliases.zsh"   ~/.config/zsh/
 _link "$DOTFILES/zsh/git-helpers.zsh"   ~/.config/zsh/
 _link "$DOTFILES/zsh/git-worktrees.zsh" ~/.config/zsh/
+_link "$DOTFILES/zsh/pi-notion-routing.zsh" ~/.config/zsh/
 
 # Clean up renamed files from previous installs
 rm -f ~/.config/zsh/sv.zsh  # renamed to sv-completion.zsh
