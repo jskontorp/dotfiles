@@ -94,6 +94,23 @@ run_test() {
   printf "\nConfig syntax:\n"
   check "gitconfig parses cleanly"         'dexec git config --file /home/testuser/.gitconfig --list'
 
+  # --- pi-notion-routing cwd → auth file mapping ---
+  printf "\npi-notion-routing auth mapping:\n"
+  check "personal: ~/code/personal/foo → personal" \
+    'dexec zsh -c "source ~/.config/zsh/pi-notion-routing.zsh; [[ \$(_pi_notion_auth_file /home/testuser/code/personal/foo) == */notion-mcp-auth-personal.json ]]"'
+  check "personal wins over volve segment" \
+    'dexec zsh -c "source ~/.config/zsh/pi-notion-routing.zsh; [[ \$(_pi_notion_auth_file /home/testuser/code/personal/volve-notes) == */notion-mcp-auth-personal.json ]]"'
+  check "volve: /repos/volve/api → volve" \
+    'dexec zsh -c "source ~/.config/zsh/pi-notion-routing.zsh; [[ \$(_pi_notion_auth_file /repos/volve/api) == */notion-mcp-auth-volve.json ]]"'
+  check "volve: trailing segment /srv/volve → volve" \
+    'dexec zsh -c "source ~/.config/zsh/pi-notion-routing.zsh; [[ \$(_pi_notion_auth_file /srv/volve) == */notion-mcp-auth-volve.json ]]"'
+  check "volve: underscore separator /srv/x_volve_y → volve" \
+    'dexec zsh -c "source ~/.config/zsh/pi-notion-routing.zsh; [[ \$(_pi_notion_auth_file /srv/x_volve_y) == */notion-mcp-auth-volve.json ]]"'
+  check "no match: /tmp/foo → empty (default fallback)" \
+    'dexec zsh -c "source ~/.config/zsh/pi-notion-routing.zsh; [[ -z \$(_pi_notion_auth_file /tmp/foo) ]]"'
+  check "no false positive: /srv/evolve/x → empty" \
+    'dexec zsh -c "source ~/.config/zsh/pi-notion-routing.zsh; [[ -z \$(_pi_notion_auth_file /srv/evolve/x) ]]"'
+
   # --- Install integrity ---
   printf "\nIntegrity:\n"
   check "no broken symlinks in \$HOME" \
@@ -117,6 +134,8 @@ run_test() {
   check "at least 5 skill symlinks"        'dexec bash -c "[[ \$(find ~/.pi/agent/skills -maxdepth 1 -type l | wc -l) -ge 5 ]]"'
   check "settings.json lists pi-linear-tools package" \
     'dexec grep -q "@fink-andreas/pi-linear-tools" /home/testuser/.pi/agent/settings.json'
+  check "settings.json lists pi-notion package" \
+    'dexec grep -q "@feniix/pi-notion" /home/testuser/.pi/agent/settings.json'
 
   # --- Shell behaviour ---
   printf "\nShell behaviour:\n"
