@@ -77,10 +77,11 @@ if [[ -f "$SKILL_LOCK" ]]; then
       base=$(basename "$d")
       [[ -d "$SKILL_CACHE/$base" ]] || mv "$d" "$SKILL_CACHE/$base"
     done
-    rm -f "$HOME/.agents/.skill-lock.json"
     rmdir "$HOME/.agents/skills" 2>/dev/null || true
-    rmdir "$HOME/.agents" 2>/dev/null || true
   fi
+  # Clean up leftover ~/.agents/.skill-lock.json from the old cache scheme
+  rm -f "$HOME/.agents/.skill-lock.json"
+  rmdir "$HOME/.agents" 2>/dev/null || true
 
   python3 -c "
 import json, os, sys
@@ -105,6 +106,8 @@ for name, info in data.get('skills', {}).items():
   # Symlink marketplace skills. `scope` field (optional per entry) is either
   # "global" (default → ~/.pi/agent/skills/<name>) or "project:<name>" →
   # resolves via projects.conf and symlinks into <repo>/.pi/skills/<name>.
+  # If scope changes between runs, stale symlinks at other locations (that we
+  # created, identified by target matching $SKILL_CACHE/<name>) are removed.
   python3 -c "
 import json, sys
 with open(sys.argv[1]) as f:
@@ -114,10 +117,15 @@ for name, info in data.get('skills', {}).items():
 " "$SKILL_LOCK" | while IFS=$'\t' read -r name scope; do
     content="$SKILL_CACHE/$name"
     [[ ! -d "$content" ]] && continue
+
+    # Compute the desired symlink target for the current scope.
+    desired=""
     if [[ "$scope" == "global" ]]; then
-      # Custom skills (already linked above) take precedence
-      [[ -e ~/.pi/agent/skills/"$name" ]] && continue
-      _linkd "$content" ~/.pi/agent/skills/"$name"
+      # Custom skills (already linked above, real dir not a symlink) take precedence
+      if [[ -e ~/.pi/agent/skills/"$name" && ! -L ~/.pi/agent/skills/"$name" ]]; then
+        continue
+      fi
+      desired="$HOME/.pi/agent/skills/$name"
     elif [[ "$scope" == project:* ]]; then
       proj="${scope#project:}"
       repo=""
@@ -134,18 +142,37 @@ for name, info in data.get('skills', {}).items():
           fi
         done < "$DOTFILES/projects.conf"
       fi
-      if [[ -z "$repo" ]]; then
+      if [[ -n "$repo" ]]; then
+        mkdir -p "$repo/.pi/skills"
+        desired="$repo/.pi/skills/$name"
+      else
         echo "  ⚠ Scope project:$proj for $name: project not found in projects.conf or not checked out, skipping" >&2
-        continue
       fi
-      mkdir -p "$repo/.pi/skills"
-      target="$repo/.pi/skills/$name"
-      # If global symlink exists (e.g., scope was just changed from global), remove it
-      [[ -L ~/.pi/agent/skills/"$name" ]] && rm ~/.pi/agent/skills/"$name"
-      _linkd "$content" "$target"
     else
       echo "  ⚠ Skill $name has unknown scope '$scope', skipping" >&2
     fi
+
+    # Clean up stale symlinks we previously created at other locations.
+    # Only remove symlinks whose target is $SKILL_CACHE/<name> (our ownership guard).
+    glink="$HOME/.pi/agent/skills/$name"
+    if [[ -L "$glink" && "$(readlink "$glink")" == "$SKILL_CACHE/$name" && "$glink" != "$desired" ]]; then
+      rm "$glink"
+    fi
+    if [[ -f "$DOTFILES/projects.conf" ]]; then
+      while IFS= read -r line; do
+        [[ "$line" =~ ^[[:space:]]*# ]] && continue
+        [[ -z "${line// /}" ]] && continue
+        read -r _ p_path <<< "$line"
+        p_path="${p_path/#\~/$HOME}"
+        plink="$p_path/.pi/skills/$name"
+        if [[ -L "$plink" && "$(readlink "$plink")" == "$SKILL_CACHE/$name" && "$plink" != "$desired" ]]; then
+          rm "$plink"
+        fi
+      done < "$DOTFILES/projects.conf"
+    fi
+
+    # Create the symlink at the desired location.
+    [[ -n "$desired" ]] && _linkd "$content" "$desired"
   done
 
   # Prune marketplace skills no longer in the lock file

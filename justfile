@@ -351,13 +351,22 @@ new-skill name:
     echo "next: fill in the description, then run \`just link\`"
     ${EDITOR:-nvim} "$dir/SKILL.md"
 
-# Add a marketplace skill to pi/skill-lock.json. Fetches HEAD SHA, appends entry, runs `just link`.
-# Usage: just add-skill <url> <name> [skill-subpath] [scope]
+# Add a marketplace skill to pi/skill-lock.json. Fetches HEAD SHA (unless --rev),
+# appends entry, runs `just link` (via install.sh). Use --dry-run to preview.
+# Usage: just add-skill <url> <name> [subpath] [scope] [rev] [dry-run]
+# Positional args:
+#   url         upstream GitHub URL
+#   name        skill identifier (a-z, 0-9, _-)
+#   subpath     path to skill dir inside upstream (default: skills/<name>)
+#   scope       "global" (default) or "project:<project-name>"
+#   rev         explicit commit SHA (default: resolves HEAD)
+#   dry-run     "dry-run" to preview without writing
 # Examples:
 #   just add-skill https://github.com/vercel-labs/skills find-skills
 #   just add-skill https://github.com/neondatabase/agent-skills neon-postgres skills/neon-postgres project:volve-ai
+#   just add-skill https://github.com/x/y my-skill skills/my-skill global '' dry-run
 [group('edit')]
-add-skill url name subpath="" scope="global":
+add-skill url name subpath="" scope="global" rev="" dry_run="":
     #!/usr/bin/env bash
     set -euo pipefail
     name="{{name}}"
@@ -365,43 +374,93 @@ add-skill url name subpath="" scope="global":
     url="{{url}}"
     subpath="{{subpath}}"
     scope="{{scope}}"
+    dry_run="{{dry_run}}"
     [[ -z "$subpath" ]] && subpath="skills/$name"
+    # Catch common footgun: subpath accidentally receiving a scope value
+    if [[ "$subpath" == project:* || "$subpath" == "global" ]]; then
+      echo "error: subpath looks like a scope value ('$subpath'). Order: url name [subpath] [scope]" >&2
+      exit 1
+    fi
+    [[ "$scope" == "global" || "$scope" == project:* ]] || { echo "error: invalid scope '$scope' (use 'global' or 'project:<name>')" >&2; exit 1; }
     # skill-lock.json stores skillPath including trailing SKILL.md
     skill_path="${subpath%/SKILL.md}/SKILL.md"
     lock="{{DOTFILES}}/pi/skill-lock.json"
-    # Resolve upstream HEAD SHA
-    echo "Resolving HEAD SHA of $url ..."
-    rev=$(git ls-remote "$url" HEAD | awk '{print $1}')
-    [[ -z "$rev" ]] && { echo "error: failed to resolve HEAD SHA for $url" >&2; exit 1; }
+    # Resolve upstream HEAD SHA (unless overridden via --rev)
+    rev="{{rev}}"
+    if [[ -z "$rev" ]]; then
+      echo "Resolving HEAD SHA of $url ..."
+      rev=$(git ls-remote "$url" HEAD | awk '{print $1}') || { echo "error: git ls-remote failed for $url" >&2; exit 1; }
+      [[ -z "$rev" ]] && { echo "error: no HEAD found at $url" >&2; exit 1; }
+    fi
     echo "  rev: $rev"
     # Append entry via python + json (preserves structure)
-    python3 - "$lock" "$name" "$url" "$skill_path" "$rev" "$scope" <<'PYEOF'
+    python3 - "$lock" "$name" "$url" "$skill_path" "$rev" "$scope" "$dry_run" <<'PYEOF'
     import json, sys, datetime
-    lock_path, name, url, skill_path, rev, scope = sys.argv[1:7]
+    lock_path, name, url, skill_path, rev, scope, dry_run = sys.argv[1:8]
     with open(lock_path) as f:
         data = json.load(f)
     if name in data.get("skills", {}):
         print(f"error: skill '{name}' already in lock file", file=sys.stderr)
         sys.exit(1)
-    now = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.000Z")
     entry = {
         "source": url.replace("https://github.com/", "").replace(".git", ""),
         "sourceType": "github",
         "sourceUrl": url,
         "skillPath": skill_path,
         "skillFolderHash": rev,
-        "installedAt": now,
-        "updatedAt": now,
     }
     if scope != "global":
         entry["scope"] = scope
+    if dry_run == "dry-run":
+        print("--- preview (dry-run, nothing written) ---")
+        print(f'  "{name}": ' + json.dumps(entry, indent=2))
+        sys.exit(0)
     data.setdefault("skills", {})[name] = entry
     with open(lock_path, "w") as f:
         json.dump(data, f, indent=2)
         f.write("\n")
     print(f"added '{name}' to {lock_path}")
     PYEOF
-    echo "running just link ..."
+    if [[ "$dry_run" == "dry-run" ]]; then
+      echo "(dry-run: skipping install.sh)"
+      exit 0
+    fi
+    echo "running install.sh ..."
+    {{DOTFILES}}/install.sh
+
+# Bump a marketplace skill's pinned SHA to upstream HEAD, then re-install.
+# Usage: just update-skill <name>
+[group('edit')]
+update-skill name:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    name="{{name}}"
+    [[ "$name" =~ ^[a-zA-Z0-9_-]+$ ]] || { echo "error: invalid skill name '$name'" >&2; exit 1; }
+    lock="{{DOTFILES}}/pi/skill-lock.json"
+    url=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); e=d.get('skills',{}).get(sys.argv[2]); print(e['sourceUrl'] if e else '')" "$lock" "$name")
+    [[ -z "$url" ]] && { echo "error: '$name' not found in $lock" >&2; exit 1; }
+    echo "Resolving HEAD SHA of $url ..."
+    rev=$(git ls-remote "$url" HEAD | awk '{print $1}') || { echo "error: git ls-remote failed" >&2; exit 1; }
+    [[ -z "$rev" ]] && { echo "error: no HEAD found at $url" >&2; exit 1; }
+    old=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d['skills'][sys.argv[2]].get('skillFolderHash',''))" "$lock" "$name")
+    if [[ "$rev" == "$old" ]]; then
+      echo "already at HEAD ($rev); nothing to do"
+      exit 0
+    fi
+    echo "  $old -> $rev"
+    python3 - "$lock" "$name" "$rev" <<'PYEOF'
+    import json, sys
+    lock_path, name, rev = sys.argv[1:4]
+    with open(lock_path) as f:
+        data = json.load(f)
+    data["skills"][name]["skillFolderHash"] = rev
+    with open(lock_path, "w") as f:
+        json.dump(data, f, indent=2)
+        f.write("\n")
+    PYEOF
+    # Clear cache so install.sh re-fetches at the new rev
+    rm -rf "$HOME/.local/share/pi-skills/$name"
+    echo "running install.sh ..."
     {{DOTFILES}}/install.sh
 
 # Open an existing pi skill's SKILL.md in $EDITOR, regardless of cwd
