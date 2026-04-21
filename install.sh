@@ -97,6 +97,25 @@ for name, info in data.get('skills', {}).items():
     [[ -e ~/.pi/agent/skills/"$name" ]] && continue
     _linkd "$HOME/.agents/skills/$name" ~/.pi/agent/skills/"$name"
   done
+
+  # Prune marketplace skills no longer in the lock file
+  lock_names=$(python3 -c "
+import json, sys
+with open(sys.argv[1]) as f:
+    data = json.load(f)
+print('\n'.join(data.get('skills', {}).keys()))
+" "$SKILL_LOCK")
+  for skill_dir in ~/.agents/skills/*/; do
+    [[ ! -d "$skill_dir" ]] && continue
+    name=$(basename "$skill_dir")
+    if ! echo "$lock_names" | grep -qx "$name"; then
+      echo "Pruning pi skill: $name"
+      rm -rf "$skill_dir"
+      link="$HOME/.pi/agent/skills/$name"
+      # Remove dangling symlink (target now missing)
+      [[ -L "$link" && ! -e "$link" ]] && rm "$link"
+    fi
+  done
 fi
 
 # bat theme
