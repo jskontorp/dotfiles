@@ -252,3 +252,65 @@ git:
 [group('edit')]
 ghostty:
     nvim "$HOME/Library/Application Support/com.mitchellh.ghostty/config"
+
+# Scaffold a new custom global pi skill and remind to run `just link`
+[group('edit')]
+new-skill name:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    name="{{name}}"
+    [[ "$name" =~ ^[a-zA-Z0-9_-]+$ ]] || { echo "error: invalid skill name '$name' (use a-zA-Z0-9_-)" >&2; exit 1; }
+    dir="{{DOTFILES}}/pi/agent/skills/$name"
+    if [[ -e "$dir" ]]; then
+      echo "error: $dir already exists" >&2
+      exit 1
+    fi
+    mkdir -p "$dir"
+    cat > "$dir/SKILL.md" <<EOF
+    ---
+    name: $name
+    description: TODO — what this skill does and when to use it.
+    ---
+
+    # $name
+
+    TODO
+    EOF
+    echo "created $dir/SKILL.md"
+    echo "next: fill in the description, then run \`just link\`"
+    ${EDITOR:-nvim} "$dir/SKILL.md"
+
+# Open an existing pi skill's SKILL.md in $EDITOR, regardless of cwd
+[group('edit')]
+edit-skill name:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    name="{{name}}"
+    [[ "$name" =~ ^[a-zA-Z0-9_-]+$ ]] || { echo "error: invalid skill name '$name' (use a-zA-Z0-9_-)" >&2; exit 1; }
+    editor="${EDITOR:-nvim}"
+    global="{{DOTFILES}}/pi/agent/skills/$name/SKILL.md"
+    lock="{{DOTFILES}}/pi/skill-lock.json"
+    if [[ -f "$global" ]]; then
+      exec $editor "$global"
+    fi
+    proj=()
+    while IFS= read -r line; do proj+=("$line"); done < <(find "{{DOTFILES}}/projects" -mindepth 4 -maxdepth 4 -path "*/skills/$name/SKILL.md" 2>/dev/null)
+    if [[ ${#proj[@]} -eq 1 ]]; then
+      exec $editor "${proj[0]}"
+    elif [[ ${#proj[@]} -gt 1 ]]; then
+      echo "error: skill '$name' exists in multiple projects:" >&2
+      printf '  %s\n' "${proj[@]}" >&2
+      exit 1
+    fi
+    if command -v jq &>/dev/null && jq -e --arg n "$name" '.skills[$n]' "$lock" >/dev/null 2>&1; then
+      url=$(jq -r --arg n "$name" '.skills[$n].sourceUrl' "$lock")
+      path=$(jq -r --arg n "$name" '.skills[$n].skillPath' "$lock")
+      echo "'$name' is a marketplace skill tracked in skill-lock.json" >&2
+      echo "  source: $url" >&2
+      echo "  path:   $path" >&2
+      echo "editing the installed copy would be overwritten on next \`just link\`" >&2
+      echo "to fork: copy to dotfiles/pi/agent/skills/$name/ and remove from skill-lock.json" >&2
+      exit 1
+    fi
+    echo "error: no skill named '$name' found in dotfiles" >&2
+    exit 1

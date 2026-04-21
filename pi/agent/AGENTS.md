@@ -41,3 +41,14 @@ When the user asks for an ELIND, don't produce a separate simplified section. In
 
 When the user includes NAJA in a prompt, treat it as a discussion — not a go-signal.
 Do not edit, write, or execute commands. Reading files to inform the answer is fine.
+
+# Where pi skills and extensions live
+
+This file is symlinked from `~/code/personal/dotfiles/pi/agent/AGENTS.md`. Skills and extensions that travel across machines are tracked in that repo:
+
+- Custom global skill you authored → `dotfiles/pi/agent/skills/<name>/`
+- Marketplace skill from a GitHub repo → add entry to `dotfiles/pi/skill-lock.json`
+- Skill needed in only one project → `dotfiles/projects/<repo>/skills/<name>/` (repo mapped via `projects.conf`)
+- Global extension → `dotfiles/pi/agent/extensions/<name>.ts`
+
+Run `just link` after changes. Use `just new-skill <name>` to scaffold and `just edit-skill <name>` to open an existing skill regardless of cwd.
