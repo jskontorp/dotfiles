@@ -5,6 +5,7 @@
   "hideThinkingBlock": false,
   "lastChangelogVersion": "0.67.6",
   "packages": [
-    "npm:@fink-andreas/pi-linear-tools"
+    "npm:@fink-andreas/pi-linear-tools",
+    "npm:@feniix/pi-notion"
   ]
 }
