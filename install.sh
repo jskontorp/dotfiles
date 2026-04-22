@@ -66,18 +66,15 @@ if [[ -d "$DOTFILES/pi/agent/extensions" ]]; then
 fi
 
 # --- Claude Code linking ---
-# Mirror pi skills compatible with Claude Code into ~/.claude/skills/, and link
-# the Claude-only CLAUDE.md addendum (which @-imports the shared AGENTS.md).
-# Skills requiring pi's runtime (delegate, solve-ticket) or pi extensions
-# (linear-issue, notion-write) are excluded.
-CLAUDE_SKILL_EXCLUDE=(delegate linear-issue notion-write solve-ticket)
-
+# Mirror pi skills compatible with Claude Code into ~/.claude/skills/, and
+# materialise the Claude-only CLAUDE.md addendum (which @-imports the shared
+# AGENTS.md). Skills opt out via `claude-compatible: false` in their SKILL.md
+# frontmatter (pi ignores unknown fields). This only applies to global pi
+# skills; per-project skills are authored deliberately and are mirrored as-is.
 _claude_skill_excluded() {
-  local name="$1" ex
-  for ex in "${CLAUDE_SKILL_EXCLUDE[@]}"; do
-    [[ "$name" == "$ex" ]] && return 0
-  done
-  return 1
+  local skill_md="$1/SKILL.md"
+  [[ -f "$skill_md" ]] || return 1
+  grep -Eq '^claude-compatible:[[:space:]]*false[[:space:]]*$' "$skill_md"
 }
 
 mkdir -p ~/.claude ~/.claude/skills
@@ -85,13 +82,19 @@ mkdir -p ~/.claude ~/.claude/skills
 # Prune broken symlinks (pre-migration debris + stale entries from prior runs)
 find ~/.claude/skills -maxdepth 1 -type l ! -exec test -e {} \; -delete 2>/dev/null
 
-_link "$DOTFILES/claude/CLAUDE.md" ~/.claude/CLAUDE.md
+# Generate ~/.claude/CLAUDE.md from template with $DOTFILES substituted so the
+# @-import resolves to an absolute path on any host (macOS, Linux VM, Docker
+# test). Written as a real file rather than a symlink because the path must be
+# host-absolute for Claude's import resolver. rm -f first so we don't write
+# through a stale symlink back into the template. Not added to the manifest —
+# validate-manifest.sh asserts symlinks only.
+rm -f ~/.claude/CLAUDE.md
+sed "s|\$DOTFILES|$DOTFILES|g" "$DOTFILES/claude/CLAUDE.md" > ~/.claude/CLAUDE.md
 
 for skill in "$DOTFILES/pi/agent/skills"/*/; do
   [[ ! -d "$skill" ]] && continue
-  base="$(basename "$skill")"
-  _claude_skill_excluded "$base" && continue
-  _linkd "$skill" ~/.claude/skills/"$base"
+  _claude_skill_excluded "$skill" && continue
+  _linkd "$skill" ~/.claude/skills/"$(basename "$skill")"
 done
 
 # --- Marketplace pi skills (from lock file) ---
@@ -314,10 +317,12 @@ if [[ -f "$DOTFILES/projects.conf" ]]; then
         [[ ! -d "$sub" ]] && continue
         sub_name="$(basename "$sub")"
         if [[ "$sub_name" == "skills" ]]; then
-          # Individual skill symlinks (same pattern as global skills)
+          # Individual skill symlinks (same pattern as global skills).
+          # Exclusion is frontmatter-driven (claude-compatible: false), so a
+          # project skill can opt out for Claude explicitly without any
+          # central list — no risk of silent name-shadowing.
           [[ -L "$local_pi/skills" ]] && rm "$local_pi/skills"
           mkdir -p "$local_pi/skills"
-          # Mirror project skills into <repo>/.claude/skills/ (same exclusion list)
           local_claude_skills="$candidate/.claude/skills"
           mkdir -p "$local_claude_skills"
           find "$local_claude_skills" -maxdepth 1 -type l ! -exec test -e {} \; -delete 2>/dev/null
@@ -325,7 +330,7 @@ if [[ -f "$DOTFILES/projects.conf" ]]; then
             [[ ! -d "$skill" ]] && continue
             skill_name="$(basename "$skill")"
             _linkd "$skill" "$local_pi/skills/$skill_name"
-            _claude_skill_excluded "$skill_name" && continue
+            _claude_skill_excluded "$skill" && continue
             _linkd "$skill" "$local_claude_skills/$skill_name"
           done
         else

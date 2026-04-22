@@ -8,6 +8,7 @@ description: >-
   (e.g. "review all five modules", "refactor these three services").
 compatibility: Requires pi, tmux (recommended for parallel execution, falls back to sequential)
 allowed-tools: Bash(pi:*) Bash(tmux:*) Bash(cat:*) Bash(mkdir:*) Bash(timeout:*) Bash(gtimeout:*) Bash(kill:*) Read Write Edit
+claude-compatible: false
 ---
 
 # Delegate

@@ -3,6 +3,7 @@ name: interactive-rebase
 description: Perform an interactive git rebase without opening an editor. Use when the user wants to rebase, squash, reorder, edit, fixup, or drop commits interactively. Handles rebase-todo editing programmatically so vim never blocks the coding agent.
 compatibility: Requires git
 allowed-tools: Bash(git:*) Bash(sed:*) Bash(cat:*)
+disable-model-invocation: true
 ---
 
 # Interactive Rebase

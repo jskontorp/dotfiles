@@ -7,6 +7,7 @@ description: >-
   similar. The correct workspace (Volve vs. personal) is auto-selected from
   cwd by the shell wrapper in pi-notion-routing.zsh — do not try to pass a
   workspace yourself. Writes are gated; reads are not.
+claude-compatible: false
 ---
 
 # Notion writes (draft → confirm → execute)

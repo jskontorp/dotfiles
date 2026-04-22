@@ -6,6 +6,7 @@ description: >-
   "file a ticket", "add to linear", or similar. The correct workspace (Volve
   vs. personal) is auto-selected from cwd by the linear-routing extension —
   do not try to pass an API key or workspace yourself.
+claude-compatible: false
 ---
 
 # Linear issue (draft → confirm → create)

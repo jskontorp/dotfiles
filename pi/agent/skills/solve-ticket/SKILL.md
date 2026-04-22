@@ -7,6 +7,7 @@ description: >-
   "implement TECH-123", or any request that starts from a Linear ticket identifier.
 compatibility: Requires git, tmux, pi, gh (GitHub CLI), `timeout`/`gtimeout` (coreutils), a JS package manager (bun/npm/pnpm/yarn), and access to the linear + notion tools
 allowed-tools: Bash(git:*) Bash(bun:*) Bash(npm:*) Bash(pnpm:*) Bash(yarn:*) Bash(tmux:*) Bash(gh:*) Bash(node:*) Bash(curl:*) Bash(pi:*) Read Write Edit linear notion
+claude-compatible: false
 ---
 
 # Solve Ticket
