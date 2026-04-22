@@ -294,9 +294,46 @@ skills:
     print()
     print(f"({len(entries)} skills tracked by dotfiles. Pi sessions also load skills shipped by installed pi packages, e.g. setup-oauth + workspace-explorer from @feniix/pi-notion.)")
 
-# Run install validation in Docker
+# Run dotfiles install validation in Docker (full integration). For fast
+# skill unit tests, use `just test-skills` / `just test-skill <name>`.
+[group('test')]
 test target="both":
     {{DOTFILES}}/test/verify.sh {{target}}
+
+# Run unit tests for a single skill (expects `<skill>/tests/run.sh`).
+[group('test')]
+test-skill name:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    runner="{{DOTFILES}}/pi/agent/skills/{{name}}/tests/run.sh"
+    if [[ ! -x "$runner" ]]; then
+      echo "error: no test runner at $runner" >&2
+      exit 1
+    fi
+    exec "$runner"
+
+# Run unit tests across every skill that has a `tests/run.sh`. Tolerates
+# missing tests/ (most skills don't have any); fails overall if any skill's
+# suite fails.
+[group('test')]
+test-skills:
+    #!/usr/bin/env bash
+    set -uo pipefail
+    rc=0
+    ran=0
+    for d in {{DOTFILES}}/pi/agent/skills/*/tests; do
+      [[ -d "$d" ]] || continue
+      runner="$d/run.sh"
+      [[ -x "$runner" ]] || continue
+      ran=$((ran + 1))
+      skill_name=$(basename "$(dirname "$d")")
+      echo "==== $skill_name ===="
+      "$runner" || rc=$?
+    done
+    if [[ "$ran" -eq 0 ]]; then
+      echo "no skill tests found"
+    fi
+    exit "$rc"
 
 # --- Edit configs ---
 
