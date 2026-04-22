@@ -1,16 +1,19 @@
 ---
 name: solve-ticket
 description: >-
-  Implement a Linear ticket end-to-end: understand → plan → worktree → implement → verify → peer-review → user-review → deliver.
+  Implement a Linear ticket end-to-end in a JS webapp repo:
+  understand → plan → worktree → implement → verify → peer-review → user-review → deliver.
   Use when the user says "solve TECH-123", "create a solution for TECH-123", "work on TECH-123",
   "implement TECH-123", or any request that starts from a Linear ticket identifier.
-compatibility: Requires git, pnpm, tmux, pi, gh (GitHub CLI), and access to the linear + notion tools
-allowed-tools: Bash(git:*) Bash(pnpm:*) Bash(tmux:*) Bash(gh:*) Bash(node:*) Bash(curl:*) Bash(pi:*) Read Write Edit linear notion
+compatibility: Requires git, tmux, pi, gh (GitHub CLI), `timeout`/`gtimeout` (coreutils), a JS package manager (bun/npm/pnpm/yarn), and access to the linear + notion tools
+allowed-tools: Bash(git:*) Bash(bun:*) Bash(npm:*) Bash(pnpm:*) Bash(yarn:*) Bash(tmux:*) Bash(gh:*) Bash(node:*) Bash(curl:*) Bash(pi:*) Read Write Edit linear notion
 ---
 
 # Solve Ticket
 
 Implement a Linear ticket in an isolated git worktree with a dedicated dev server.
+
+Deterministic bookkeeping (workspace setup, dev-server readiness polling, peer-review spawn + round cap) is factored into scripts under `scripts/`. Judgement-heavy phases (understand, plan, implement, triage, summarise) remain inline. Tests live under `tests/` — run via `just test-skill solve-ticket`.
 
 ## Shell Preamble
 
@@ -21,27 +24,45 @@ TICKET="tech-123"            # lowercase for branch/worktree/tmux
 DEV_SESSION="$TICKET-dev"
 ROOT=$(git worktree list | awk 'NR==1 {print $1}')
 WT="${ROOT}_worktrees/$TICKET"
+STATE_DIR="${ROOT}_worktrees/.pi-state"
+
+# Default branch — explicit steps so we don't silently fall through to "".
+BASE=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')
+[ -n "$BASE" ] || BASE=$(gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name' 2>/dev/null)
+[ -n "$BASE" ] || BASE=main
+
+# Machine state (PM, WT, BRANCH_EXISTED) — written by workspace-setup.sh in Phase 3.
+# Sourcing is safe-if-absent; $PM is unavailable until Phase 3 has run.
+# shellcheck disable=SC1090
+[ -f "$STATE_DIR/$TICKET.env" ] && . "$STATE_DIR/$TICKET.env"
+
+# Path to this skill's scripts (stable — ~/.pi/agent/skills is a symlink to the dotfiles copy).
+SCRIPTS="$HOME/.pi/agent/skills/solve-ticket/scripts"
 ```
 
 Use **uppercase** (`TECH-123`) for the `linear` tool. Use full `$WT/…` paths for Read/Write/Edit. Never write to the main repo.
 
-## Progress File
+## State files
 
-Maintain `$WT/.pi-progress.md` (gitignored) for crash recovery. Update after every phase transition and every completed plan step.
+Two files per ticket, both under `$STATE_DIR` (which lives at `${ROOT}_worktrees/.pi-state`, **outside** any worktree so git ignores them entirely):
 
-```markdown
-# TECH-123: <title>
+- **`$TICKET.md`** — human/LLM-authored progress. Title, Plan, Current Phase, Notes, Peer Review log. Edited via the Write tool throughout. Template:
 
-## Plan
-1. [x] <completed step>
-2. [ ] <pending step>
+  ```markdown
+  # TECH-123: <title>
 
-## Current Phase
-Phase 4 — Implement (step 2)
+  ## Plan
+  1. [x] <completed step>
+  2. [ ] <pending step>
 
-## Notes
-- <decisions, blockers, things tried>
-```
+  ## Current Phase
+  Phase 4 — Implement (step 2)
+
+  ## Notes
+  - <decisions, blockers, things tried>
+  ```
+
+- **`$TICKET.env`** — machine state, owned by scripts. Shell-sourceable (`ROOT=`, `WT=`, `STATE_DIR=`, `PM=`, `BRANCH_EXISTED=`). Do **not** hand-edit; the preamble sources it.
 
 ## User Context
 
@@ -49,10 +70,8 @@ Text after the ticket ID (e.g. `solve TECH-123 - focus on mobile layout`) is **s
 
 ## Verification
 
-The standard verification procedure, referenced by later phases:
-
-1. `cd "$WT" && pnpm build` — fix type errors.
-2. `cd "$WT" && pnpm lint` — fix lint errors.
+1. `cd "$WT" && $PM run build` — fix type errors.
+2. `cd "$WT" && $PM run lint` — fix lint errors.
 3. `tmux capture-pane -p -t "$DEV_SESSION" -S -100` — check for runtime errors.
 
 ---
@@ -61,7 +80,7 @@ The standard verification procedure, referenced by later phases:
 
 Run from the main worktree before creating any workspace.
 
-1. **Sync main** — `git fetch origin main && git pull origin main` to ensure investigation is against the latest codebase.
+1. **Sync default branch** — `git fetch origin "$BASE" && git pull origin "$BASE"` to ensure investigation is against the latest codebase.
 2. `linear get_issue TECH-123` — read title, description, comments, labels, priority.
 3. **Linked context** — Notion URLs → use `notion get_page` for quick lookups, or load the **read-notion** skill if available. Related Linear issues → `linear get_issue` for context only, **do not expand scope**. Note any GitHub refs.
 4. **Find affected code** — grep for keywords, entity names, route paths. Read relevant files to understand current state.
@@ -80,53 +99,47 @@ Present a plan **before** creating the worktree:
 **Files:** … **New files:** … **Risk:** …
 ```
 
-**Wait for explicit approval.** Then create the progress file after Phase 3 setup.
+**Wait for explicit approval.** Then proceed to Phase 3.
 
 ## Phase 3 — Workspace
 
-Create worktree, symlink env, install dependencies:
+Run `workspace-setup.sh`. It detects the package manager from `$ROOT`'s lockfile (pnpm > bun > yarn > npm, intentionally pnpm-first during multi-lockfile migrations), creates the worktree from `origin/$BASE`, symlinks env files, runs `$PM install`, and writes `$STATE_DIR/$TICKET.env`.
 
 ```bash
-if [ ! -d "$WT" ]; then
-  mkdir -p "$(dirname "$WT")"
-  git fetch origin main
-  git worktree add --no-track -b "$TICKET" "$WT" origin/main
-fi
-[ -f "$ROOT/.env.local" ] && [ ! -e "$WT/.env.local" ] && ln -s "$ROOT/.env.local" "$WT/.env.local"
-cd "$WT" && pnpm install
+"$SCRIPTS/workspace-setup.sh" "$TICKET" "$BASE"
 ```
 
-Add progress/review files to the worktree-local exclude (not tracked in `.gitignore`):
+**Behaviour contract:** exit 0 success; 64 bad args; 66 no lockfile (skill doesn't fit); 70 git failure (fetch / worktree add); 73 install failure — recover by `cd "$WT" && $PM install` inline, then continue.
+
+Re-source the env file so `$PM` becomes available in this block:
 
 ```bash
-GIT_EXCLUDE="$(cd "$WT" && git rev-parse --git-path info/exclude)"
-mkdir -p "$(dirname "$GIT_EXCLUDE")"
-for pat in '.pi-progress.md' '.pi-review-*.md'; do
-  grep -Fqx "$pat" "$GIT_EXCLUDE" 2>/dev/null || echo "$pat" >> "$GIT_EXCLUDE"
-done
+# shellcheck disable=SC1090
+. "$STATE_DIR/$TICKET.env"
 ```
 
-If the branch already exists but no worktree: ask the user — check it out, or start fresh from main?
+**Write the progress markdown** via the Write tool to `$STATE_DIR/$TICKET.md`. Use the template from **State files** above with:
+- `# <TICKET_UPPER>: <actual title from Phase 1>`
+- Plan section populated from the approved Phase 2 plan
+- `## Current Phase` set to `Phase 3 — Workspace`
 
-Start dev server in a detached tmux session. Wait up to 30s for "Ready in" output. If it doesn't appear, warn and continue.
+If the file already exists (resume path), leave it alone — see **Resuming Previous Work**.
+
+**Start the dev server:**
 
 ```bash
-tmux kill-session -t "$DEV_SESSION" 2>/dev/null || true
-tmux new-session -d -s "$DEV_SESSION" -c "$WT" "pnpm dev"
-for i in $(seq 1 30); do
-  tmux capture-pane -p -t "$DEV_SESSION" | grep -q "Ready in" && echo "Dev server ready." && break
-  [ "$i" -eq 30 ] && echo "⚠ Dev server not ready — check: tmux attach -t $DEV_SESSION"
-  sleep 1
-done
+"$SCRIPTS/dev-server.sh" "$TICKET" "$WT" "$PM"
 ```
 
-Tell the user: `Dev server: tmux attach -t <ticket>-dev`
+**Behaviour contract:** matches `ready in|listening on|local: http` (Next.js, Vite, Express, Fastify); 30 polls × 1s; tails 30 lines on failure. Exit 0 ready or cleanly skipped (no `scripts.dev`); 64 bad args; 68 timeout; 69 session died.
+
+Tell the user: `Dev server: tmux attach -t <ticket>-dev` (unless skipped).
 
 ## Phase 4 — Implement
 
 Write code in the worktree. Follow AGENTS.md conventions.
 
-Work incrementally — one concern at a time. Run `pnpm build` after each significant change. Monitor dev server via `tmux capture-pane -p -t "$DEV_SESSION" -S -50` and fix runtime errors immediately. If an error isn't immediately obvious, load the **systematic-debugging** skill — do not guess-and-fix. If the port is taken, Next.js auto-increments — note the actual URL from tmux output.
+Work incrementally — one concern at a time. Run the build step from **Verification** after each significant change. Monitor dev server via `tmux capture-pane -p -t "$DEV_SESSION" -S -50` and fix runtime errors immediately. If the dev framework auto-increments the port when taken (Next.js, Vite, etc.), note the actual URL from tmux output. On non-trivial errors, see **Constraints**.
 
 Update progress file after each completed plan step.
 
@@ -138,25 +151,37 @@ If the ticket involves UI changes, also verify visually using the **webapp-testi
 
 ## Phase 6 — Peer Review
 
-Spawn an independent `pi` sub-agent to review uncommitted changes cold. Up to **2 rounds** — break early if a round produces no fixes.
+Spawn an independent `pi` sub-agent to review changes cold. Up to **2 rounds per session** — break early if a round produces no fixes.
+
+**On entry, clear stale review files from prior sessions** (this keeps round counting per-session, not per-lifetime):
+
+```bash
+rm -f "$STATE_DIR/$TICKET"-review-*.md
+```
 
 **Each round:**
 
-1. Spawn the sub-agent (5-minute timeout):
+1. Spawn the reviewer:
 
 ```bash
-ROUND=1
-TIMEOUT_CMD=()
-command -v timeout &>/dev/null && TIMEOUT_CMD=(timeout 300)
-command -v gtimeout &>/dev/null && TIMEOUT_CMD=(gtimeout 300)
-cd "$WT" && "${TIMEOUT_CMD[@]}" pi -p --no-session "review" > "$WT/.pi-review-${ROUND}.md" 2>&1 || true
+"$SCRIPTS/peer-review-spawn.sh" "$TICKET" "$WT" "$STATE_DIR" "$BASE"
+RC=$?
 ```
 
-2. Read `$WT/.pi-review-${ROUND}.md`. If empty, unparseable, or the sub-agent crashed/timed out — treat as no feedback, note in progress file, continue to Phase 7.
+**Exit-code table:**
 
-3. Triage each finding — **accept** (fix now) or **dismiss** with a one-line reason. Dismiss findings that suggest scope expansion, propose unrelated architectural changes, or conflict with ticket requirements.
+| rc    | meaning                                    | action                                          |
+|-------|--------------------------------------------|-------------------------------------------------|
+| 0     | review completed                           | read the output file, triage findings           |
+| 124   | pi timed out (partial output preserved)    | note in progress file, continue to Phase 7      |
+| 137   | pi killed (partial output preserved)       | note, continue to Phase 7                       |
+| 70    | pi failed (crashed / auth / not on PATH)   | note, continue to Phase 7 — output unreliable   |
+| 71    | 2-round cap reached                        | continue to Phase 7                             |
+| 69    | `timeout`/`gtimeout` not installed         | stop and tell the user (install coreutils)      |
 
-4. Log in progress file:
+2. On `rc=0`, read the most recent `$STATE_DIR/$TICKET-review-*.md`. Triage each finding — **accept** (fix now) or **dismiss** with a one-line reason. Dismiss findings that suggest scope expansion, propose unrelated architectural changes, or conflict with ticket requirements.
+
+3. Log in the progress file:
 
 ```markdown
 ## Peer Review — Round {n}
@@ -164,7 +189,7 @@ cd "$WT" && "${TIMEOUT_CMD[@]}" pi -p --no-session "review" > "$WT/.pi-review-${
 - ❌ <finding> — <reason>
 ```
 
-5. Fix accepted items. If fixes were made, run **Verification** and continue to the next round. If no fixes (all dismissed or clean), break.
+4. Fix accepted items. If fixes were made, re-run **Verification** and loop to the next round. If no fixes (all dismissed or clean), break.
 
 ## Phase 7 — User Review
 
@@ -180,12 +205,13 @@ Brief summary: what was built (one sentence per plan item), what peer review cau
 
 ## Phase 8 — Deliver
 
-1. **Commit** — stage and commit per the **commit** skill. Do not push or update PR — the next step handles both.
+1. **Commit** — run the **commit** skill, stopping after step 3 (commits created). Its step 4 (push prompt + summary) and step 5 (PR description update) don't apply here — `create-pr` handles the push, and there's no PR yet to update.
 2. **Draft PR** — follow the **create-pr** skill. Include `Closes TECH-123` in the body.
 3. **Kill dev server:** `tmux kill-session -t "$DEV_SESSION" 2>/dev/null || true`
 4. **Tell the user** how to clean up (do **not** remove it yourself):
    - Remove worktree only: `git worktree remove <path>`
    - Remove worktree and branch: `git worktree remove <path> && git branch -d tech-123`
+   - Remove all state files: `rm -f "$STATE_DIR/$TICKET".md "$STATE_DIR/$TICKET".env "$STATE_DIR/$TICKET"-review-*.md`
 
 After delivering the draft PR, the next invocation with the same ticket should follow **Resuming Previous Work**.
 
@@ -195,22 +221,13 @@ After delivering the draft PR, the next invocation with the same ticket should f
 
 If the worktree already exists:
 
-1. Read `$WT/.pi-progress.md` — primary source of truth.
+1. Read `$STATE_DIR/$TICKET.md` — primary source of truth for plan, phase, notes.
+   - If **missing** (state dir wiped, pre-existing worktree from before this skill version, or partial cleanup): tell the user the progress markdown is gone, ask whether to re-derive from git history or start fresh. The preamble's source of `$TICKET.env` still works if it survived; otherwise `$PM` will be unset until Phase 3 runs.
 2. Check state: `git status`, `git log --oneline -5`, `tmux has-session -t "$DEV_SESSION"`.
 3. Re-fetch ticket: `linear get_issue TECH-123` for new comments/scope changes.
-4. Restart dev server if not running (Phase 3 tmux steps).
-5. Check for open PR:
-
-```bash
-PR_STATE=$(cd "$WT" && gh pr view --json state,reviewDecision,reviews --jq '{state, reviewDecision, reviewCount: (.reviews | length)}' 2>/dev/null)
-```
-
-Route based on PR state:
-- **PR with review activity** (`reviewCount > 0` or `reviewDecision` set) → load **prepare-merge** skill.
-- **PR without review activity** + user says "prepare merge" → load **prepare-merge** skill.
-- **Otherwise** → continue implementation at Phase 4.
-
-6. Present resume summary: what's done, what's next, any notes. Ask: continue, or reset? (`git reset --hard origin/main`)
+4. **Do NOT re-run `workspace-setup.sh`.** It would re-run `$PM install` (slow, may mutate lockfile). The worktree is already set up. If the dev server isn't running, call `"$SCRIPTS/dev-server.sh" "$TICKET" "$WT" "$PM"` to restart it.
+5. **Check for open PR** via `gh pr view`. If one exists → load **prepare-merge** (it has its own gate that decides whether there's anything to do). Otherwise → continue implementation at Phase 4.
+6. Present resume summary: what's done, what's next, any notes. Ask: continue, or reset? (`git reset --hard "origin/$BASE"`)
 
 ## Constraints
 
@@ -219,5 +236,5 @@ Route based on PR state:
 - **Verify → peer review → user review before commit.**
 - **No bare `git push`** — only via `gh pr create --draft`, or when the user explicitly asks. Follow the **gh-cli** skill for all GitHub operations.
 - **One ticket, no scope creep** — related issues are noted, not implemented.
-- **3-strike cap** — after 3 failed attempts at the same error, load the **systematic-debugging** skill for structured root cause analysis. If that also stalls (3+ fixes failed), load the **step-back** skill to question the approach. Only then escalate to the user.
+- **Non-trivial error → load systematic-debugging immediately.** Don't accumulate guess-and-fix attempts; systematic-debugging's Iron Law says no fixes without root cause. If systematic-debugging stalls, load **step-back** to question the approach. Only then escalate to the user.
 - **Ambiguity → ask.**
