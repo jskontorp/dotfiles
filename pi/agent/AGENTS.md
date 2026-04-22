@@ -1,3 +1,5 @@
+> **Agent note:** Shared between pi and Claude Code. Sections marked `(pi only)` or `(claude only)` apply to that agent; everything else applies to both. Pi-specific invocations (`pi` CLI, `.ts` extensions, `just add-skill`) live under the tagged sections and are safely ignorable by the other agent.
+
 # Coding discipline
 
 Do not propose changes to code you haven't read. If the user asks about or wants you to modify a file, read it first. Understand existing code before suggesting modifications.
@@ -42,7 +44,7 @@ When the user asks for an ELIND, don't produce a separate simplified section. In
 When the user includes NAJA in a prompt, treat it as a discussion — not a go-signal.
 Do not edit, write, or execute commands. Reading files to inform the answer is fine.
 
-# Where pi skills and extensions live
+# Where pi skills and extensions live (pi only)
 
 This file is symlinked from `~/code/personal/dotfiles/pi/agent/AGENTS.md`. Skills and extensions that travel across machines are tracked in that repo:
 

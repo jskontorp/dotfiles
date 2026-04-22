@@ -65,6 +65,35 @@ if [[ -d "$DOTFILES/pi/agent/extensions" ]]; then
   done
 fi
 
+# --- Claude Code linking ---
+# Mirror pi skills compatible with Claude Code into ~/.claude/skills/, and link
+# the Claude-only CLAUDE.md addendum (which @-imports the shared AGENTS.md).
+# Skills requiring pi's runtime (delegate, solve-ticket) or pi extensions
+# (linear-issue, notion-write) are excluded.
+CLAUDE_SKILL_EXCLUDE=(delegate linear-issue notion-write solve-ticket)
+
+_claude_skill_excluded() {
+  local name="$1" ex
+  for ex in "${CLAUDE_SKILL_EXCLUDE[@]}"; do
+    [[ "$name" == "$ex" ]] && return 0
+  done
+  return 1
+}
+
+mkdir -p ~/.claude ~/.claude/skills
+
+# Prune broken symlinks (pre-migration debris + stale entries from prior runs)
+find ~/.claude/skills -maxdepth 1 -type l ! -exec test -e {} \; -delete 2>/dev/null
+
+_link "$DOTFILES/claude/CLAUDE.md" ~/.claude/CLAUDE.md
+
+for skill in "$DOTFILES/pi/agent/skills"/*/; do
+  [[ ! -d "$skill" ]] && continue
+  base="$(basename "$skill")"
+  _claude_skill_excluded "$base" && continue
+  _linkd "$skill" ~/.claude/skills/"$base"
+done
+
 # --- Marketplace pi skills (from lock file) ---
 SKILL_LOCK="$DOTFILES/pi/skill-lock.json"
 SKILL_CACHE="$HOME/.local/share/pi-skills"
@@ -288,9 +317,16 @@ if [[ -f "$DOTFILES/projects.conf" ]]; then
           # Individual skill symlinks (same pattern as global skills)
           [[ -L "$local_pi/skills" ]] && rm "$local_pi/skills"
           mkdir -p "$local_pi/skills"
+          # Mirror project skills into <repo>/.claude/skills/ (same exclusion list)
+          local_claude_skills="$candidate/.claude/skills"
+          mkdir -p "$local_claude_skills"
+          find "$local_claude_skills" -maxdepth 1 -type l ! -exec test -e {} \; -delete 2>/dev/null
           for skill in "$sub"*/; do
             [[ ! -d "$skill" ]] && continue
-            _linkd "$skill" "$local_pi/skills/$(basename "$skill")"
+            skill_name="$(basename "$skill")"
+            _linkd "$skill" "$local_pi/skills/$skill_name"
+            _claude_skill_excluded "$skill_name" && continue
+            _linkd "$skill" "$local_claude_skills/$skill_name"
           done
         else
           _linkd "$sub" "$local_pi/$sub_name"
