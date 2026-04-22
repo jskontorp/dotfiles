@@ -137,6 +137,25 @@ run_test() {
   check "settings.json lists pi-notion package" \
     'dexec grep -q "@feniix/pi-notion" /home/testuser/.pi/agent/settings.json'
 
+  # --- Claude Code linking ---
+  printf "\nClaude Code linking:\n"
+  check "\$HOME/.claude/CLAUDE.md is a regular file (not symlink)" \
+    'dexec bash -c "[[ -f /home/testuser/.claude/CLAUDE.md && ! -L /home/testuser/.claude/CLAUDE.md ]]"'
+  check "CLAUDE.md @-import path is substituted to absolute" \
+    'dexec grep -q "^@/home/testuser/dotfiles/pi/agent/AGENTS.md" /home/testuser/.claude/CLAUDE.md'
+  check "CLAUDE.md has no unsubstituted \$DOTFILES" \
+    'dexec bash -c "! grep -q \"\\\\\$DOTFILES\" /home/testuser/.claude/CLAUDE.md"'
+  check "imported AGENTS.md exists at the substituted path" \
+    'dexec test -f /home/testuser/dotfiles/pi/agent/AGENTS.md'
+  check "\$HOME/.claude/skills/ has 8 live symlinks" \
+    'dexec bash -c "[[ \$(find ~/.claude/skills -maxdepth 1 -type l | wc -l) -eq 8 ]]"'
+  for s in commit create-pr gh-cli interactive-rebase prepare-merge sandbox step-back uncommitted-changes; do
+    check "mirrored: $s"  "dexec test -L /home/testuser/.claude/skills/$s"
+  done
+  for s in delegate linear-issue notion-write solve-ticket; do
+    check "excluded: $s"  "dexec bash -c \"! test -e /home/testuser/.claude/skills/$s\""
+  done
+
   # --- Shell behaviour ---
   printf "\nShell behaviour:\n"
   check "core: EDITOR=nvim"               'dexec zsh -i -c "[[ \$EDITOR == nvim ]]"'
