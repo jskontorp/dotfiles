@@ -6,6 +6,7 @@ description: >-
   Use when the user wants to commit reviewed changes or organise work into clean git history.
 compatibility: Requires git and gh (GitHub CLI)
 allowed-tools: Bash(git:*) Bash(gh:*)
+disable-model-invocation: true
 ---
 
 # Commit

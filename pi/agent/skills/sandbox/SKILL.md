@@ -8,6 +8,7 @@ description: >-
   run long-running processes, or execute risky commands safely.
 compatibility: Requires docker (or podman). tmux strongly recommended.
 allowed-tools: Bash(docker:*) Bash(podman:*) Bash(tmux:*) Bash(cat:*) Read
+disable-model-invocation: true
 ---
 
 # Sandbox

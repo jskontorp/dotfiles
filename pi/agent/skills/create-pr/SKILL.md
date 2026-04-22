@@ -5,6 +5,7 @@ description: >-
   Use when the user says "create pr", "open pr", "draft pr", or wants to push and open a pull request.
 compatibility: Requires git, gh (GitHub CLI)
 allowed-tools: Bash(git:*) Bash(gh:*)
+disable-model-invocation: true
 ---
 
 # Create PR
