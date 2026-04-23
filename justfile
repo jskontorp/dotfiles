@@ -335,6 +335,46 @@ test-skills:
     fi
     exit "$rc"
 
+# --- Claude Code plugins ---
+
+# Install every plugin listed in ~/.claude/settings.json's enabledPlugins map.
+# Idempotent — `claude plugin install` is a no-op on already-installed plugins.
+# Run on a fresh machine after `just link` to materialise the plugin set.
+[group('claude')]
+claude-plugins-install:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    settings="$HOME/.claude/settings.json"
+    if [[ ! -f "$settings" ]]; then
+      echo "error: $settings not found — run 'just link' first" >&2
+      exit 1
+    fi
+    if ! command -v claude >/dev/null 2>&1; then
+      echo "error: 'claude' CLI not on PATH — install Claude Code first" >&2
+      exit 1
+    fi
+    plugins=$(python3 -c "
+    import json, sys
+    with open(sys.argv[1]) as f:
+        data = json.load(f)
+    for name, enabled in (data.get('enabledPlugins') or {}).items():
+        if enabled:
+            print(name)
+    " "$settings")
+    if [[ -z "$plugins" ]]; then
+      echo "no enabled plugins in $settings"
+      exit 0
+    fi
+    rc=0
+    while IFS= read -r plugin; do
+      echo "==== claude plugin install $plugin ===="
+      # `claude plugin install` may self-upgrade the claude binary on first run.
+      # hash -r refreshes bash's command cache so subsequent iterations find it.
+      hash -r 2>/dev/null || true
+      claude plugin install "$plugin" || rc=$?
+    done <<< "$plugins"
+    exit "$rc"
+
 # --- Edit configs ---
 
 [group('edit')]

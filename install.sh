@@ -91,6 +91,13 @@ find ~/.claude/skills -maxdepth 1 -type l ! -exec test -e {} \; -delete 2>/dev/n
 rm -f ~/.claude/CLAUDE.md
 sed "s|\$DOTFILES|$DOTFILES|g" "$DOTFILES/claude/CLAUDE.md" > ~/.claude/CLAUDE.md
 
+# ~/.claude/settings.json is Claude's user-scope config (enabledPlugins, env,
+# hooks, permissions). Symlink tracks it in dotfiles so it's portable across
+# machines. `/plugin install` writes through the symlink, keeping dotfiles
+# in sync automatically. Run `just claude-plugins-install` on a fresh machine
+# to materialise the enabledPlugins set via `claude plugin install`.
+_link "$DOTFILES/claude/settings.json" ~/.claude/settings.json
+
 for skill in "$DOTFILES/pi/agent/skills"/*/; do
   [[ ! -d "$skill" ]] && continue
   _claude_skill_excluded "$skill" && continue
