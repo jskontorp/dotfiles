@@ -6,7 +6,7 @@ set -euo pipefail
 # Usage: sandbox-capture.sh [--lines N] [--name NAME]
 
 LINES=100
-NAME="pi-sandbox"
+NAME="agent-sandbox"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in

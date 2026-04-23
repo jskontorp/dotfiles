@@ -5,7 +5,7 @@ set -euo pipefail
 #
 # Usage: sandbox-down.sh [--name NAME]
 
-NAME="pi-sandbox"
+NAME="agent-sandbox"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in

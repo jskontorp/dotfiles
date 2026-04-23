@@ -13,7 +13,7 @@ disable-model-invocation: true
 
 # Sandbox
 
-Run anything in a disposable container. Prefer tmux as the control layer — the user can `tmux attach -t pi-sandbox` to watch live.
+Run anything in a disposable container. Prefer tmux as the control layer — the user can `tmux attach -t agent-sandbox` to watch live.
 
 All `scripts/` paths resolve relative to this skill's directory. Ensure they're executable:
 
@@ -27,7 +27,7 @@ chmod +x scripts/sandbox-up.sh scripts/sandbox-exec.sh scripts/sandbox-capture.s
 
 | Project signal | Image |
 |----------------|-------|
-| `Dockerfile` in root | Build: `docker build -t pi-sandbox-img .` |
+| `Dockerfile` in root | Build: `docker build -t agent-sandbox-img .` |
 | `docker-compose.yml` / `compose.yml` | Use `docker compose run` (see Rules) |
 | `package.json` | `node:lts` |
 | `go.mod` | `golang:latest` |
@@ -48,10 +48,10 @@ Ask the user if ambiguous.
 | `--image` | `ubuntu:latest` | Container image |
 | `--mount` | cwd | Host dir to mount |
 | `--rw` | off | Mount read-write |
-| `--name` | `pi-sandbox` | Container + tmux session name |
+| `--name` | `agent-sandbox` | Container + tmux session name |
 | `--workdir` | `/workspace` | Mount point + working dir inside container (override for images that expect `/app`, `/src`, etc.) |
 
-On name collision, the script appends a suffix (`pi-sandbox-2`, …) and prints `SANDBOX_NAME=<actual>`. **Parse and use the actual name for all subsequent calls.**
+On name collision, the script appends a suffix (`agent-sandbox-2`, …) and prints `SANDBOX_NAME=<actual>`. **Parse and use the actual name for all subsequent calls.**
 
 ### 3. Run Commands
 
@@ -91,13 +91,13 @@ When tmux is unavailable. The user loses live observability.
 
 ```bash
 # Start (override the container path if the image expects something other than /workspace)
-docker run -d --name pi-sandbox -v "$(pwd):/workspace:ro" -w /workspace <image> sleep infinity
+docker run -d --name agent-sandbox -v "$(pwd):/workspace:ro" -w /workspace <image> sleep infinity
 
 # Run
-docker exec pi-sandbox <command>
+docker exec agent-sandbox <command>
 
 # Tear down
-docker rm -f pi-sandbox
+docker rm -f agent-sandbox
 ```
 
 ## Rules

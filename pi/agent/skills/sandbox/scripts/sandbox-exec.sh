@@ -14,7 +14,7 @@ COMMAND="${1:?Usage: sandbox-exec.sh \"<command>\" [--timeout SECONDS] [--name N
 shift
 
 TIMEOUT=120
-NAME="pi-sandbox"
+NAME="agent-sandbox"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in

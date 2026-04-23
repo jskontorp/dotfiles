@@ -1,4 +1,4 @@
-> **Agent note:** Shared between pi and Claude Code. Sections marked `(pi only)` or `(claude only)` apply to that agent; everything else applies to both. Pi-specific invocations (`pi` CLI, `.ts` extensions, `just add-skill`) live under the tagged sections and are safely ignorable by the other agent.
+> **Agent note:** Shared between pi and Claude Code. Sections marked `(pi only)` or `(claude only)` apply only to that agent; the other agent should treat them as non-actionable context. Pi-specific invocations (`pi` CLI, `.ts` extensions, `just add-skill`) live under the tagged sections.
 
 # Coding discipline
 
@@ -51,11 +51,11 @@ Recognised fields (both agents ignore unknown keys, so it is safe to set agent-s
 - `name`, `description`, `allowed-tools` — standard. Same format for pi and Claude Code.
 - `compatibility` — free-form note about runtime requirements (docker, tmux, pi, etc.). Informational only.
 - `claude-compatible: false` — opt the skill out of mirroring to `~/.claude/skills/`. Set on skills that depend on pi's runtime (`Bash(pi:*)`), pi extensions (`.ts` files under `pi/agent/extensions/`), or pi-only tool names (e.g. raw `linear`, `notion`). `install.sh` skips these during the Claude mirror step.
-- `disable-model-invocation: true` — Claude won't auto-pick the skill on description match; it must be triggered explicitly via slash-command (e.g. `/commit`). Set on side-effect skills where a false-positive description match would cause real damage — unwanted commit, push, history rewrite, container spin-up. Pi ignores the field and dispatches by description as usual.
+- `disable-model-invocation: true` *(claude only)* — Claude won't auto-pick the skill on description match; it must be triggered explicitly via slash-command (e.g. `/commit`). Set on side-effect skills where a false-positive description match would cause real damage — unwanted commit, push, history rewrite, container spin-up. Pi ignores the field and dispatches by description as usual.
 
 # Where pi skills and extensions live (pi only)
 
-This file is symlinked from `~/code/personal/dotfiles/pi/agent/AGENTS.md`. Skills and extensions that travel across machines are tracked in that repo:
+This file lives at `~/code/personal/dotfiles/pi/agent/AGENTS.md` (pi reads it via symlink at `~/.pi/agent/AGENTS.md`; Claude reads it via `@`-import from `~/.claude/CLAUDE.md`). Skills and extensions that travel across machines are tracked in the dotfiles repo:
 
 - Custom global skill you authored → `dotfiles/pi/agent/skills/<name>/`
 - Marketplace skill from a GitHub repo → `just add-skill <url> <name> [subpath] [scope]`, or hand-edit `dotfiles/pi/skill-lock.json`. Entries support optional `scope: "project:<name>"` to symlink into that project's repo only.

@@ -8,7 +8,7 @@ set -euo pipefail
 IMAGE="ubuntu:latest"
 MOUNT_PATH="$(pwd)"
 MOUNT_MODE="ro"
-NAME="pi-sandbox"
+NAME="agent-sandbox"
 WORKDIR="/workspace"
 
 while [[ $# -gt 0 ]]; do
