@@ -14,7 +14,8 @@
       "Bash(realpath:*)",
       "Bash(readlink:*)",
       "Bash(basename:*)",
-      "Bash(dirname:*)"
+      "Bash(dirname:*)",
+      "WebSearch"
     ]
   }
 }
