@@ -4,5 +4,17 @@
     "pr-review-toolkit@claude-plugins-official": true,
     "hookify@claude-plugins-official": true,
     "pyright-lsp@claude-plugins-official": true
+  },
+  "permissions": {
+    "allow": [
+      "Bash(tree:*)",
+      "Bash(jq:*)",
+      "Bash(rg:*)",
+      "Bash(file:*)",
+      "Bash(realpath:*)",
+      "Bash(readlink:*)",
+      "Bash(basename:*)",
+      "Bash(dirname:*)"
+    ]
   }
 }
