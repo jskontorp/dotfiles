@@ -34,6 +34,17 @@ update:
     brew update && brew bundle --file="{{MAC}}/Brewfile" && brew upgrade && brew cleanup
     echo "📦 global pnpm packages..."
     pnpm add -g {{GLOBAL_PNPM}}
+
+    # Ensure Claude Code's native binary is present (see VM recipe for rationale).
+    echo "📦 claude native binary..."
+    CLAUDE_PKG="$(pnpm root -g)/@anthropic-ai/claude-code"
+    if [[ -f "$CLAUDE_PKG/install.cjs" ]]; then
+      node "$CLAUDE_PKG/install.cjs" || echo "  ⚠ claude install.cjs failed — run manually: node $CLAUDE_PKG/install.cjs"
+    elif ! claude --version >/dev/null 2>&1; then
+      echo "  ⚠ claude binary not runnable and no install.cjs present."
+      echo "    Try: pnpm install -g --force @anthropic-ai/claude-code"
+    fi
+
     echo "📦 tmux plugins..."
     "$HOME/.tmux/plugins/tpm/bin/install_plugins"
     echo "✅ Done"
@@ -153,6 +164,22 @@ update:
     curl -fsSL https://get.pnpm.io/install.sh | SHELL=/bin/bash sh -
     echo "📦 global pnpm packages..."
     pnpm add -g {{GLOBAL_PNPM}}
+
+    # Claude Code ships a native binary via a postinstall script (install.cjs).
+    # pnpm may skip postinstalls (--ignore-scripts) or optional deps
+    # (--omit=optional), leaving `claude` launchable but failing with
+    # "native binary not installed" at runtime. Running install.cjs
+    # explicitly is idempotent and fixes both cases. Newer versions ship
+    # install.cjs inside the package; if absent (older version), verify
+    # runtime works and warn.
+    echo "📦 claude native binary..."
+    CLAUDE_PKG="$(pnpm root -g)/@anthropic-ai/claude-code"
+    if [[ -f "$CLAUDE_PKG/install.cjs" ]]; then
+      node "$CLAUDE_PKG/install.cjs" || echo "  ⚠ claude install.cjs failed — run manually: node $CLAUDE_PKG/install.cjs"
+    elif ! claude --version >/dev/null 2>&1; then
+      echo "  ⚠ claude binary not runnable and no install.cjs present."
+      echo "    Try: pnpm install -g --force @anthropic-ai/claude-code"
+    fi
 
     echo "📦 tmux plugins..."
     "$HOME/.tmux/plugins/tpm/bin/install_plugins"
