@@ -6,6 +6,7 @@ description: >-
   operations — see the commit, uncommitted-changes, and interactive-rebase skills for those.
 compatibility: Requires gh (GitHub CLI) authenticated with repo access
 allowed-tools: Bash(gh:*) Bash(git:*)
+disable-model-invocation: true
 ---
 
 # GitHub CLI

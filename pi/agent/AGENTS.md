@@ -10,7 +10,7 @@ Don't add features, refactor code, or make "improvements" beyond what was asked.
 
 Don't create helpers, utilities, or abstractions for one-time operations. Don't design for hypothetical future requirements. Three similar lines of code is better than a premature abstraction.
 
-If an approach fails, diagnose why before switching tactics — read the error, check your assumptions, try a focused fix. Don't retry the identical action blindly, but don't abandon a viable approach after a single failure either.
+If an approach fails, diagnose why before switching tactics — read the error, check your assumptions, try a focused fix. Don't retry the identical action blindly, but don't abandon a viable approach after a single failure either. A failed tool call, build error, or test failure is evidence to diagnose, not a knowledge gap to report; the "say so and move on" rule under Standards applies to things you genuinely can't observe (user intent, undocumented conventions, external systems you have no access to), not to things the next tool call would reveal.
 
 Call multiple tools in a single response when there are no dependencies between the calls. If two reads or searches are independent, run them in parallel.
 
@@ -51,7 +51,7 @@ Recognised fields (both agents ignore unknown keys, so it is safe to set agent-s
 - `name`, `description`, `allowed-tools` — standard. Same format for pi and Claude Code.
 - `compatibility` — free-form note about runtime requirements (docker, tmux, pi, etc.). Informational only.
 - `claude-compatible: false` — opt the skill out of mirroring to `~/.claude/skills/`. Set on skills that depend on pi's runtime (`Bash(pi:*)`), pi extensions (`.ts` files under `pi/agent/extensions/`), or pi-only tool names (e.g. raw `linear`, `notion`). `install.sh` skips these during the Claude mirror step.
-- `disable-model-invocation: true` *(claude only)* — Claude won't auto-pick the skill on description match; it must be triggered explicitly via slash-command (e.g. `/commit`). Set on side-effect skills where a false-positive description match would cause real damage — unwanted commit, push, history rewrite, container spin-up. Pi ignores the field and dispatches by description as usual.
+- `disable-model-invocation: true` *(claude only)* — Claude won't auto-pick the skill on description match; it must be triggered explicitly via slash-command (e.g. `/commit`). Set on side-effect skills where a false-positive description match would cause real damage — unwanted commit, push, history rewrite, container spin-up. Pi ignores the field and dispatches by description as usual — so adding this flag to a skill that already exists on pi does **not** protect pi from auto-invocation. For pi-side gating, narrow the skill description to a verbatim trigger phrase the user must say (the looser the description, the more surface for hook-injected text to fire it).
 
 # Where pi skills and extensions live (pi only)
 
