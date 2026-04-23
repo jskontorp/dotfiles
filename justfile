@@ -8,7 +8,7 @@ MAC      := DOTFILES / "machine/mac"
 VM       := DOTFILES / "machine/vm"
 
 # Global pnpm packages — shared across mac and vm update recipes
-GLOBAL_PNPM := "@anthropic-ai/claude-code @mariozechner/pi-coding-agent"
+GLOBAL_PNPM := "@anthropic-ai/claude-code @mariozechner/pi-coding-agent pyright"
 
 # Tools that both platforms must report in `just status`.
 # Platform-specific tools (brew, fnm, docker, etc.) are added per-recipe.
