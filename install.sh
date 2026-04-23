@@ -97,6 +97,18 @@ for skill in "$DOTFILES/pi/agent/skills"/*/; do
   _linkd "$skill" ~/.claude/skills/"$(basename "$skill")"
 done
 
+# Mirror Claude-native subagents (dotfiles/claude/agents/*.md) into ~/.claude/agents/.
+# Subagents differ from skills: they fork context, scope tools, and are invoked
+# via the Task tool (not description-matching in the main loop).
+mkdir -p ~/.claude/agents
+find ~/.claude/agents -maxdepth 1 -type l ! -exec test -e {} \; -delete 2>/dev/null
+if [[ -d "$DOTFILES/claude/agents" ]]; then
+  for agent in "$DOTFILES/claude/agents"/*.md; do
+    [[ -f "$agent" ]] || continue
+    _link "$agent" ~/.claude/agents/"$(basename "$agent")"
+  done
+fi
+
 # --- Marketplace pi skills (from lock file) ---
 SKILL_LOCK="$DOTFILES/pi/skill-lock.json"
 SKILL_CACHE="$HOME/.local/share/pi-skills"
