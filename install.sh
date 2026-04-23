@@ -157,8 +157,10 @@ for name, info in data.get('skills', {}).items():
   done
 
   # Symlink marketplace skills. `scope` field (optional per entry) is either
-  # "global" (default → ~/.pi/agent/skills/<name>) or "project:<name>" →
-  # resolves via projects.conf and symlinks into <repo>/.pi/skills/<name>.
+  # "global" (default → ~/.pi/agent/skills/<name> + ~/.claude/skills/<name>) or
+  # "project:<name>" → resolves via projects.conf and symlinks into
+  # <repo>/.pi/skills/<name> + <repo>/.claude/skills/<name>. Claude mirror is
+  # skipped for skills with `claude-compatible: false` in their SKILL.md.
   # If scope changes between runs, stale symlinks at other locations (that we
   # created, identified by target matching $SKILL_CACHE/<name>) are removed.
   python3 -c "
@@ -171,63 +173,85 @@ for name, info in data.get('skills', {}).items():
     content="$SKILL_CACHE/$name"
     [[ ! -d "$content" ]] && continue
 
-    # Compute the desired symlink target for the current scope.
+    # Compute the desired symlink targets for the current scope.
     desired=""
-    if [[ "$scope" == "global" ]]; then
-      # Custom skills (already linked above, real dir not a symlink) take precedence
-      if [[ -e ~/.pi/agent/skills/"$name" && ! -L ~/.pi/agent/skills/"$name" ]]; then
-        continue
-      fi
-      desired="$HOME/.pi/agent/skills/$name"
-    elif [[ "$scope" == project:* ]]; then
-      proj="${scope#project:}"
-      repo=""
-      if [[ -f "$DOTFILES/projects.conf" ]]; then
-        while IFS= read -r line; do
-          [[ "$line" =~ ^[[:space:]]*# ]] && continue
-          [[ -z "${line// /}" ]] && continue
-          read -r p_name p_path <<< "$line"
-          [[ "$p_name" != "$proj" ]] && continue
-          p_path="${p_path/#\~/$HOME}"
-          if [[ -d "$p_path/.git" ]]; then
-            repo="$p_path"
-            break
+    desired_claude=""
+    claude_ok=true
+    _claude_skill_excluded "$content" && claude_ok=false
+    # A custom skill with this name already linked above (as a symlink, via
+    # _linkd) shadows the marketplace entry. Leave desired/desired_claude
+    # empty so the cleanup block below wipes any stale cache-pointing
+    # symlinks (including per-project links from a prior scope), and the
+    # create block no-ops. Guard by source dir, not link type.
+    if [[ ! -d "$DOTFILES/pi/agent/skills/$name" ]]; then
+      if [[ "$scope" == "global" ]]; then
+        desired="$HOME/.pi/agent/skills/$name"
+        $claude_ok && desired_claude="$HOME/.claude/skills/$name"
+      elif [[ "$scope" == project:* ]]; then
+        proj="${scope#project:}"
+        repo=""
+        if [[ -f "$DOTFILES/projects.conf" ]]; then
+          while IFS= read -r line; do
+            [[ "$line" =~ ^[[:space:]]*# ]] && continue
+            [[ -z "${line// /}" ]] && continue
+            read -r p_name p_path <<< "$line"
+            [[ "$p_name" != "$proj" ]] && continue
+            p_path="${p_path/#\~/$HOME}"
+            if [[ -d "$p_path/.git" ]]; then
+              repo="$p_path"
+              break
+            fi
+          done < "$DOTFILES/projects.conf"
+        fi
+        if [[ -n "$repo" ]]; then
+          mkdir -p "$repo/.pi/skills"
+          desired="$repo/.pi/skills/$name"
+          if $claude_ok; then
+            mkdir -p "$repo/.claude/skills"
+            desired_claude="$repo/.claude/skills/$name"
           fi
-        done < "$DOTFILES/projects.conf"
-      fi
-      if [[ -n "$repo" ]]; then
-        mkdir -p "$repo/.pi/skills"
-        desired="$repo/.pi/skills/$name"
+        else
+          echo "  ⚠ Scope project:$proj for $name: project not found in projects.conf or not checked out, skipping" >&2
+        fi
       else
-        echo "  ⚠ Scope project:$proj for $name: project not found in projects.conf or not checked out, skipping" >&2
+        echo "  ⚠ Skill $name has unknown scope '$scope', skipping" >&2
       fi
-    else
-      echo "  ⚠ Skill $name has unknown scope '$scope', skipping" >&2
     fi
 
     # Clean up stale symlinks we previously created at other locations.
     # Only remove symlinks whose target is $SKILL_CACHE/<name> (our ownership guard).
-    glink="$HOME/.pi/agent/skills/$name"
-    if [[ -L "$glink" && "$(readlink "$glink")" == "$SKILL_CACHE/$name" && "$glink" != "$desired" ]]; then
-      rm "$glink"
-    fi
+    for link_root in "$HOME/.pi/agent/skills" "$HOME/.claude/skills"; do
+      stale="$link_root/$name"
+      case "$link_root" in
+        */.claude/skills) want="$desired_claude" ;;
+        *)                want="$desired"        ;;
+      esac
+      if [[ -L "$stale" && "$(readlink "$stale")" == "$SKILL_CACHE/$name" && "$stale" != "$want" ]]; then
+        rm "$stale"
+      fi
+    done
     if [[ -f "$DOTFILES/projects.conf" ]]; then
       while IFS= read -r line; do
         [[ "$line" =~ ^[[:space:]]*# ]] && continue
         [[ -z "${line// /}" ]] && continue
         read -r _ p_path <<< "$line"
         p_path="${p_path/#\~/$HOME}"
-        plink="$p_path/.pi/skills/$name"
-        if [[ -L "$plink" && "$(readlink "$plink")" == "$SKILL_CACHE/$name" && "$plink" != "$desired" ]]; then
-          rm "$plink"
-        fi
+        for sub in ".pi/skills" ".claude/skills"; do
+          stale="$p_path/$sub/$name"
+          case "$sub" in
+            .claude/skills) want="$desired_claude" ;;
+            *)              want="$desired"        ;;
+          esac
+          if [[ -L "$stale" && "$(readlink "$stale")" == "$SKILL_CACHE/$name" && "$stale" != "$want" ]]; then
+            rm "$stale"
+          fi
+        done
       done < "$DOTFILES/projects.conf"
     fi
 
-    # Create the symlink at the desired location.
-    if [[ -n "$desired" ]]; then
-      _linkd "$content" "$desired"
-    fi
+    # Create the symlinks at the desired locations.
+    [[ -n "$desired" ]]        && _linkd "$content" "$desired"
+    [[ -n "$desired_claude" ]] && _linkd "$content" "$desired_claude"
   done
 
   # Prune marketplace skills no longer in the lock file
@@ -243,9 +267,22 @@ print('\n'.join(data.get('skills', {}).keys()))
     if ! echo "$lock_names" | grep -qx "$name"; then
       echo "Pruning pi skill: $name"
       rm -rf "$skill_dir"
-      link="$HOME/.pi/agent/skills/$name"
-      # Remove dangling symlink (target now missing)
-      [[ -L "$link" && ! -e "$link" ]] && rm "$link"
+      # Remove dangling symlinks (target now missing) at both global roots
+      # and at every known project's pi/claude skill dirs
+      for link in "$HOME/.pi/agent/skills/$name" "$HOME/.claude/skills/$name"; do
+        [[ -L "$link" && ! -e "$link" ]] && rm "$link"
+      done
+      if [[ -f "$DOTFILES/projects.conf" ]]; then
+        while IFS= read -r line; do
+          [[ "$line" =~ ^[[:space:]]*# ]] && continue
+          [[ -z "${line// /}" ]] && continue
+          read -r _ p_path <<< "$line"
+          p_path="${p_path/#\~/$HOME}"
+          for link in "$p_path/.pi/skills/$name" "$p_path/.claude/skills/$name"; do
+            [[ -L "$link" && ! -e "$link" ]] && rm "$link"
+          done
+        done < "$DOTFILES/projects.conf"
+      fi
     fi
   done
 fi
