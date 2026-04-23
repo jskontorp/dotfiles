@@ -156,6 +156,25 @@ run_test() {
     check "excluded: $s"  "dexec bash -c \"! test -e /home/testuser/.claude/skills/$s\""
   done
 
+  # --- Claude Code agents (~/.claude/agents/) ---
+  # Scoped to Claude-authored subagents only — pi skills legitimately use
+  # Bash(pi:*) / linear tool names, so global grep would false-positive.
+  printf "\nClaude Code agents:\n"
+  check "\$HOME/.claude/agents/solve-ticket.md is a live symlink" \
+    'dexec bash -c "[[ -L /home/testuser/.claude/agents/solve-ticket.md && -e /home/testuser/.claude/agents/solve-ticket.md ]]"'
+  check "solve-ticket agent has no Bash(pi:*) refs" \
+    'dexec bash -c "! grep -q \"Bash(pi:\\*)\" /home/testuser/.claude/agents/solve-ticket.md"'
+  check "solve-ticket agent has no \"pi -p\" invocations" \
+    'dexec bash -c "! grep -Eq \"\\\\bpi -p\\\\b\" /home/testuser/.claude/agents/solve-ticket.md"'
+  check "solve-ticket agent has no claude-compatible frontmatter (wrong schema)" \
+    'dexec bash -c "! grep -q \"^claude-compatible:\" /home/testuser/.claude/agents/solve-ticket.md"'
+  check "solve-ticket agent has no allowed-tools frontmatter (wrong schema)" \
+    'dexec bash -c "! grep -q \"^allowed-tools:\" /home/testuser/.claude/agents/solve-ticket.md"'
+  check "solve-ticket agent tools: is single-line CSV" \
+    'dexec bash -c "[[ \$(grep -c \"^tools:\" /home/testuser/.claude/agents/solve-ticket.md) -eq 1 ]]"'
+  check "solve-ticket referenced scripts exist" \
+    'dexec bash -c "test -x /home/testuser/dotfiles/pi/agent/skills/solve-ticket/scripts/workspace-setup.sh && test -x /home/testuser/dotfiles/pi/agent/skills/solve-ticket/scripts/dev-server.sh && test -x /home/testuser/dotfiles/pi/agent/skills/solve-ticket/scripts/peer-review-spawn.sh"'
+
   # --- Shell behaviour ---
   printf "\nShell behaviour:\n"
   check "core: EDITOR=nvim"               'dexec zsh -i -c "[[ \$EDITOR == nvim ]]"'
