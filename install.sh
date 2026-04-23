@@ -352,6 +352,14 @@ if [[ -f "$DOTFILES/projects.conf" ]]; then
             _claude_skill_excluded "$skill" && continue
             _linkd "$skill" "$local_claude_skills/$skill_name"
           done
+        elif [[ "$sub_name" == "hookify" ]]; then
+          # Claude hookify rules: symlink each hookify.*.local.md into
+          # <repo>/.claude/ (hookify discovers rules there by naming convention).
+          mkdir -p "$candidate/.claude"
+          for rule in "$sub"hookify.*.local.md; do
+            [[ ! -f "$rule" ]] && continue
+            _link "$rule" "$candidate/.claude/$(basename "$rule")"
+          done
         else
           _linkd "$sub" "$local_pi/$sub_name"
         fi
