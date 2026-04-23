@@ -49,7 +49,9 @@ log() { echo "$@" >&2; }
 ROOT=$(git worktree list 2>/dev/null | awk 'NR==1 {print $1}')
 [ -n "$ROOT" ] && [ -d "$ROOT" ] || { log "error: could not determine main worktree (run from inside the repo)"; exit 70; }
 WT="${ROOT}_worktrees/$TICKET"
-STATE_DIR="${ROOT}_worktrees/.pi-state"
+# State dir name is parameterized so Claude can use .claude-state while pi
+# keeps .pi-state — both agents share these scripts via dotfiles.
+STATE_DIR="${ROOT}_worktrees/${STATE_DIR_NAME:-.pi-state}"
 
 # ----- PM detection (prefer persisted state, else lockfile) -----
 PM=""

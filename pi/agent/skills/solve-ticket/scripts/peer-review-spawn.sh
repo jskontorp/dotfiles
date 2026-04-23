@@ -14,11 +14,15 @@
 #   - Exits 71 if ROUND > 2 (cap reached).
 #   - Atomically reserves $STATE_DIR/$TICKET-review-$ROUND.md via noclobber;
 #     writes to .partial and renames on success.
-#   - Spawns `pi -p --no-session --no-skills` under `timeout` or `gtimeout`
-#     (hard-fails 69 if neither is installed — otherwise the cap isn't real).
+#   - Spawns the reviewer (default `pi -p --no-session --no-skills`, overridable
+#     via REVIEW_CMD) under `timeout` or `gtimeout` (hard-fails 69 if neither is
+#     installed — otherwise the cap isn't real).
 #
-# Env knobs (for tests):
+# Env knobs:
 #   PI_TIMEOUT   seconds (default 300)
+#   REVIEW_CMD   reviewer invocation (default "pi -p --no-session --no-skills").
+#                Claude's solve-ticket agent sets REVIEW_CMD="claude -p".
+#                Tokens are whitespace-split into a bash array.
 #
 # Exit codes:
 #   0    review completed — triage the output file
@@ -93,7 +97,10 @@ PROMPT="Review uncommitted + committed changes on this branch vs origin/$BASE fo
 
 log "spawning peer review (round $ROUND, timeout ${PI_TIMEOUT}s) ..."
 RC=0
-( cd "$WT" && "$TIMEOUT_BIN" "$PI_TIMEOUT" pi -p --no-session --no-skills "$PROMPT" ) > "$PARTIAL" 2>&1 || RC=$?
+# Word-split REVIEW_CMD into an array (bash-array pattern — single-quoting would
+# pass the whole string as an executable name and fail).
+read -r -a REVIEW_CMD_ARR <<< "${REVIEW_CMD:-pi -p --no-session --no-skills}"
+( cd "$WT" && "$TIMEOUT_BIN" "$PI_TIMEOUT" "${REVIEW_CMD_ARR[@]}" "$PROMPT" ) > "$PARTIAL" 2>&1 || RC=$?
 
 case "$RC" in
   0)
