@@ -1,12 +1,15 @@
+<!-- generated from dotfiles/claude/CLAUDE.md by install.sh — do not edit ~/.claude/CLAUDE.md directly -->
 # Claude Code addendum
 
 The imported AGENTS.md is the shared agent-behaviour contract — written to apply to any coding agent that reads it. Read it fully.
 
 Sections tagged `(pi only)` describe pi-specific tooling. When you see them, translate:
 
-- `pi` CLI / `Bash(pi:*)` / "pi sub-agents" → use the `Agent` tool (subagents live at `~/.claude/agents/`).
-- `.ts` extensions under `dotfiles/pi/agent/extensions/` → Claude equivalents are MCP servers or built-in tools. `web-search.ts` is already covered by native `WebSearch` / `WebFetch`.
-- `just add-skill`, `skill-lock.json`, `dotfiles/pi/agent/skills/` → the dotfiles paths are shared; the `just` workflow manages both agents. Same SKILL.md format works for both.
+- `pi` CLI / `Bash(pi:*)` — pi-only invocations; ignore.
+- "pi sub-agents" (pi's tmux-based delegate skill) → Claude's `Agent` tool (subagents live at `~/.claude/agents/`).
+- Pi skill dispatch (description match in pi's runtime) → Claude's auto-invoking `Skill` mechanism. Same SKILL.md format — opt a skill out with `claude-compatible: false`.
+- `.ts` extensions under `dotfiles/pi/agent/extensions/` do not apply to Claude. Use native MCP tools (`mcp__claude_ai_Linear__*`, `mcp__claude_ai_Notion__*`), `WebSearch`, `WebFetch`.
+- `just add-skill`, `skill-lock.json`, `dotfiles/pi/agent/skills/` — shared layout; the `just` workflow manages both agents.
 
 Skills opt out of Claude with `claude-compatible: false` in their frontmatter (pi ignores unknown fields). `install.sh` skips those when mirroring to `~/.claude/skills/`.
 

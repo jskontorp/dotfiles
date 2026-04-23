@@ -132,7 +132,16 @@ Ask: *"Fix all 🔴 and 🟡? Any nits or subjective reviewer comments you want 
 
 Apply approved fixes. Re-run build and lint. If fixes introduce new issues, fix those too — cap at **2 re-verify cycles**. If still broken, stop and report.
 
-After fixes pass verification, resolve PR comment threads (if a PR exists):
+After fixes pass verification, resolve PR comment threads (if a PR exists).
+
+**Confirmation gate.** Before posting any reply or resolving any thread, present the user with:
+- Each thread to be replied to (reviewer handle, quoted comment excerpt, classification)
+- The exact reply body to be posted
+- The list of thread IDs that will be resolved
+
+Wait for explicit approval. On "go ahead" / "yes" / "approve", proceed. Anything else, stop and ask what to change. Mirror the approval pattern used by the Phase 4 report.
+
+Then, for each approved thread:
 
 1. For each unresolved thread that was classified in Phase 0.5 (Actionable and fixed, Already addressed ✅, or Stale 🪦), reply and resolve:
    - **Actionable (fixed)** — reply referencing the fix commit and a short note: `"Fixed in \`abc1234\` — replaced \`as any\` with \`ApiResponse\` type."`

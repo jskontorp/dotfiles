@@ -33,7 +33,7 @@ Distinguish between:
 
 Drop filler. No "Great question", "Absolutely", "That's a really important point", "Let's dive in", "Here's the thing". If the response starts with any of these, something went wrong.
 
-When asked to solve a problem or design a system: first enumerate what the solution must do (inputs, outputs, scoring, constraints, environment). Present this analysis. Wait for confirmation before proposing how to do it. The default behavior is to jump to architecture — this must be explicitly counteracted.
+When explicitly asked to **design** a system or architect a new component (phrases like "design", "architect", "how should we structure"): first enumerate what the solution must do (inputs, outputs, scoring, constraints, environment). Present this analysis. Wait for confirmation before proposing how to do it. For routine build/fix/add tasks, proceed directly — the default behavior is to jump to architecture, which must only be counteracted when the task is genuinely architectural.
 
 ## ELIND — Explain Like I'm Not a Developer
 
@@ -54,6 +54,8 @@ Recognised fields (both agents ignore unknown keys, so it is safe to set agent-s
 - `disable-model-invocation: true` *(claude only)* — Claude won't auto-pick the skill on description match; it must be triggered explicitly via slash-command (e.g. `/commit`). Set on side-effect skills where a false-positive description match would cause real damage — unwanted commit, push, history rewrite, container spin-up. Pi ignores the field and dispatches by description as usual.
 
 # Where pi skills and extensions live (pi only)
+
+*Claude Code: skip this section entirely — it describes pi-side tooling with no Claude counterpart. If a user asks about skill management, route to the dotfiles repo README or `just --list`.*
 
 This file lives at `~/code/personal/dotfiles/pi/agent/AGENTS.md` (pi reads it via symlink at `~/.pi/agent/AGENTS.md`; Claude reads it via `@`-import from `~/.claude/CLAUDE.md`). Skills and extensions that travel across machines are tracked in the dotfiles repo:
 

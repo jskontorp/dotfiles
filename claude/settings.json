@@ -16,6 +16,23 @@
       "Bash(basename:*)",
       "Bash(dirname:*)",
       "WebSearch"
+    ],
+    "deny": [
+      "Bash(rm -rf ~/:*)",
+      "Bash(rm -rf /:*)",
+      "Bash(rm -rf $HOME:*)",
+      "Bash(git push --force origin main:*)",
+      "Bash(git push --force origin master:*)",
+      "Bash(git push -f origin main:*)",
+      "Bash(git push -f origin master:*)",
+      "Edit(~/.ssh/**)",
+      "Edit(~/.aws/**)",
+      "Edit(**/.env)",
+      "Edit(**/.env.*)",
+      "Write(~/.ssh/**)",
+      "Write(~/.aws/**)",
+      "Write(**/.env)",
+      "Write(**/.env.*)"
     ]
   }
 }

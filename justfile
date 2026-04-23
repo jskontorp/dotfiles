@@ -392,6 +392,11 @@ claude-plugins-install:
       echo "no enabled plugins in $settings"
       exit 0
     fi
+    # Ensure the official marketplace is registered — `claude plugin install
+    # <name>@claude-plugins-official` fails with "unknown marketplace" on a
+    # fresh machine otherwise. Idempotent: a no-op if already known.
+    echo "==== claude plugin marketplace add anthropics/claude-plugins-official ===="
+    claude plugin marketplace add anthropics/claude-plugins-official 2>/dev/null || true
     rc=0
     while IFS= read -r plugin; do
       echo "==== claude plugin install $plugin ===="

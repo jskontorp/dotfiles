@@ -19,10 +19,13 @@
 #     installed — otherwise the cap isn't real).
 #
 # Env knobs:
-#   PI_TIMEOUT   seconds (default 300)
-#   REVIEW_CMD   reviewer invocation (default "pi -p --no-session --no-skills").
-#                Claude's solve-ticket agent sets REVIEW_CMD="claude -p".
-#                Tokens are whitespace-split into a bash array.
+#   PI_TIMEOUT             seconds (default 300)
+#   REVIEW_CMD             reviewer invocation (default "pi -p --no-session --no-skills").
+#                          Claude's solve-ticket agent sets REVIEW_CMD="claude -p".
+#                          Tokens are whitespace-split into a bash array.
+#   REVIEW_TICKET_INSTR    the "fetch the ticket via …" clause spliced into the
+#                          prompt. Defaults to pi syntax (`linear get_issue …`).
+#                          Claude's agent overrides with the MCP tool name.
 #
 # Exit codes:
 #   0    review completed — triage the output file
@@ -93,7 +96,8 @@ cleanup() {
 trap cleanup EXIT
 
 TICKET_UPPER=$(echo "$TICKET" | tr '[:lower:]' '[:upper:]')
-PROMPT="Review uncommitted + committed changes on this branch vs origin/$BASE for $TICKET_UPPER. Start with \`git status\` and \`git diff origin/$BASE...HEAD\`, then fetch the ticket via \`linear get_issue $TICKET_UPPER\` for scope. Flag bugs, missed edge cases, and quality issues within ticket scope. Note but do not prioritize scope-expansion ideas."
+: "${REVIEW_TICKET_INSTR:=fetch the ticket via \`linear get_issue $TICKET_UPPER\`}"
+PROMPT="Review uncommitted + committed changes on this branch vs origin/$BASE for $TICKET_UPPER. Start with \`git status\` and \`git diff origin/$BASE...HEAD\`, then $REVIEW_TICKET_INSTR for scope. Flag bugs, missed edge cases, and quality issues within ticket scope. Note but do not prioritize scope-expansion ideas."
 
 log "spawning peer review (round $ROUND, timeout ${PI_TIMEOUT}s) ..."
 RC=0

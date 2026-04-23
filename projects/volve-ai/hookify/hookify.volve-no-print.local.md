@@ -5,7 +5,7 @@ event: file
 conditions:
   - field: file_path
     operator: regex_match
-    pattern: /app/.*\.py$
+    pattern: /app/(?!scripts/|migrations/).*\.py$
   - field: new_text
     operator: regex_match
     pattern: \bprint\(

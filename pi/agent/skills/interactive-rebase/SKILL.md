@@ -21,7 +21,7 @@ GIT_SEQUENCE_EDITOR="<command>" GIT_EDITOR=true git rebase -i <target>
 
 **Never** run a bare `git rebase -i` — it opens vim and blocks the agent.
 
-Use `sed -i ''` on macOS, `sed -i` on Linux.
+The examples below use `sed -i ''` (BSD sed on macOS). On Linux (GNU sed), drop the `''` — GNU sed treats the empty string as a filename. If you're writing a recipe that must run on both, prefix with `SED_I=(-i); [[ "$(uname)" == Darwin ]] && SED_I=(-i '')` and use `sed "${SED_I[@]}" …`.
 
 ## Patterns
 
