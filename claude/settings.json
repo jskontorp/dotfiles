@@ -1,10 +1,4 @@
 {
-  "enabledPlugins": {
-    "feature-dev@claude-plugins-official": true,
-    "pr-review-toolkit@claude-plugins-official": true,
-    "hookify@claude-plugins-official": true,
-    "pyright-lsp@claude-plugins-official": true
-  },
   "permissions": {
     "allow": [
       "Bash(tree:*)",
@@ -68,5 +62,12 @@
       "Write(~/.claude/hooks/**)",
       "Write(~/.claude/plugins/**)"
     ]
-  }
+  },
+  "enabledPlugins": {
+    "feature-dev@claude-plugins-official": true,
+    "pr-review-toolkit@claude-plugins-official": true,
+    "hookify@claude-plugins-official": true,
+    "pyright-lsp@claude-plugins-official": true
+  },
+  "theme": "auto"
 }
