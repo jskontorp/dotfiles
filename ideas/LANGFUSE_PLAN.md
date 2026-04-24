@@ -4,15 +4,13 @@ Self-host Langfuse on a persistent Linux host, forward Claude Code transcripts v
 
 ---
 
-## Decisions to confirm before starting
+## Decisions (confirmed 2026-04-23)
 
-1. **Hosting target.** Recommended: **Hetzner CX22 (~€4.51/mo, AMD 2 vCPU / 4 GB)** or **CAX11 (~€3.79/mo, ARM 2 vCPU / 4 GB)**. See P1.A for why Oracle Free Tier is *technically possible but fragile*. Alternatives: Docker Desktop on mac (dev-only), existing Raspberry Pi (if 8 GB+), Langfuse Cloud Hobby (free, no self-host burden — reconsider if the point is "own my data").
-2. **Network / access.** Recommended: **Cloudflare Tunnel + Cloudflare Access (email OTP)** — no public IP, no inbound ports, free for personal use. Alternative: Tailscale (simpler but every client needs tailscaled).
-3. **Feedback marker syntax.** Two options in P4.C. Recommended: **Option B (structured `!fb`)** because parseable-without-LLM wins over ergonomics at the scale of one user logging many turns.
-4. **Sanitization scope.** Recommended: regex denylist (env-var-style `KEY=value` lines, `sk-*`, `AKIA*`, `Bearer *`, `ghp_*`, `github_pat_*`) applied before send. Explicitly NOT: full DLP, semantic secret detection, file-content redaction beyond line-level.
-5. **Retention.** Recommended: 90 days. Revisit after first analysis pass — retention drives ClickHouse disk more than anything else.
-
-Confirm these five before moving past P0.
+1. **Hosting target: existing Oracle VM (`ssh oracle`).** Ubuntu 22.04 aarch64, 24 GB RAM, 121 GB free disk, Docker 29 + Compose v5 already installed. Capacity concerns in P1.A do not apply — the instance is live and reclamation-proof (already non-idle). P1.B (Hetzner) and most of P1.C become irrelevant; keep for historical context only.
+2. **Network: Cloudflare Tunnel + Cloudflare Access (email OTP).** No public IP, no inbound ports opened.
+3. **Feedback marker: free-form `!<token>`.** Any line containing `!` followed by at least one non-whitespace character is a feedback marker. Everything from the `!` up to the next whitespace/newline is captured verbatim as the tag payload. No mandatory score, no schema. See P4.C for hook semantics — **Option A wins, not Option B.** Numeric score at capture time is dropped; optional LLM-inferred score can be layered in P5 if ever needed.
+4. **Sanitization: none.** This is personal ad-hoc logging for retrospective analysis. Secrets you paste or that tools echo will appear verbatim in the Langfuse instance, which lives on your own VM behind Cloudflare Access. Do not use this setup for shared / production / customer-data flows. P6.A is skipped entirely.
+5. **Retention: unlimited.** No TTL. ClickHouse disk is 121 GB; revisit only if disk pressure appears. P6.C reduces to "do nothing" — leave Langfuse project settings at default.
 
 ---
 
@@ -37,6 +35,8 @@ Confirm these five before moving past P0.
 ---
 
 ## P1 — Host selection and infrastructure
+
+> **Confirmed: use existing `ssh oracle` instance** (24 GB RAM, 121 GB free, Docker + Compose installed, aarch64 Ubuntu 22.04). Skip this section in execution. The analysis below is retained as context for any future re-host decision.
 
 ### P1.A — Why not Oracle Cloud Free Tier (for this workload)
 
@@ -192,12 +192,17 @@ Parser: ~15-line regex in Python. The whole marker line is also stored verbatim 
 Pros: score available instantly; tags + comment both logged; verbatim preserved in `raw_marker`; parseable without LLM.
 Cons: tiny schema to remember. Mitigation: `!fb` alone prints a help reminder to stderr via the hook (hook can print to transcript; visible to user).
 
-**Recommendation: Option B.** The "LLM-parseable later" requirement is satisfied by logging `raw_marker` verbatim alongside the structured parse — both worlds available. The "numeric score for filtering" requirement is only met cleanly by Option B. Friction is one character (`!fb ` vs `!! `) plus one mandatory digit.
+**Decision: free-form, `!`-prefixed tokens.** Per user: *"anything starting with '!' that has no space/newline/etc directly after it"*. Regex: `!(\S+)`. Capture semantics:
 
-**Langfuse SDK calls at Stop-hook flush time** (sketch, not the full hook):
-- `trace.update(tags=tags)` — Langfuse tags are a flat list, perfect for coarse filter-by-tag in the UI.
-- `langfuse.create_score(trace_id=tid, name="user_feedback", value=score, data_type="NUMERIC")` — appears in the UI score column, sortable.
-- `trace.update(metadata={"feedback_comment": comment, "feedback_raw": raw_marker})` — comment in metadata, not tags, because comments aren't filter-friendly in Langfuse's UI anyway. Metadata is queryable via the SDK for the batch analysis pass.
+- Every `!<non-whitespace-run>` in the prompt becomes a tag. Multiple markers per prompt are allowed — all are captured.
+- The full verbatim prompt is stored in `raw_marker` (unchanged for analysis).
+- No numeric score at capture time. If a `!fb<digit>` or `!<digit>-<digit>` convention emerges in practice, the P5 batch LLM pass can assign scores post-hoc.
+- No stripping of the marker from the prompt — Claude sees the `!token` and it lands in the trace naturally. Simpler than rewriting the prompt payload.
+
+**Langfuse SDK calls at Stop-hook flush time** (sketch):
+- `trace.update(tags=[*markers, "has_feedback"])` — every `!token` becomes a Langfuse tag; `has_feedback` sentinel tag for easy filtering of "sessions where I said anything".
+- `trace.update(metadata={"feedback_markers": markers, "feedback_prompt": raw_prompt})` — full prompt text queryable via SDK.
+- No `create_score` call at capture time. Reserved for a later P5 enhancement if useful.
 
 ### P4.D — `claude/settings.json` stanzas
 
@@ -273,7 +278,9 @@ Patterns that surface should map to concrete edits:
 
 ## P6 — Privacy / data handling
 
-### P6.A — Minimum-viable sanitization
+> **Confirmed: no sanitization, no retention cap.** Personal ad-hoc logging, self-hosted, behind Cloudflare Access. P6.A and P6.C below are intentionally skipped. P6.B (what sanitization would NOT catch) is retained as context — if a shared use case ever appears, these are the gaps to fix first.
+
+### P6.A — Minimum-viable sanitization (SKIPPED — confirmed no sanitization)
 
 Apply in `langfuse_hook.py` before any content leaves the host. Regex denylist, line-by-line:
 
@@ -299,7 +306,7 @@ Implementation: one `sanitize(s: str) -> str` function with the regex list. Unit
 
 This is **detection of well-known patterns, not prevention**. The threat model is "don't accidentally log env-var pastes and CLI flags"; it is not "safe to forward arbitrary repo contents".
 
-### P6.C — Retention
+### P6.C — Retention (SKIPPED — confirmed unlimited)
 
 - Langfuse UI: project settings → data retention → **90 days**.
 - Rationale: long enough for quarterly pattern analysis; short enough that a breach of the VM doesn't expose a year of transcripts.
