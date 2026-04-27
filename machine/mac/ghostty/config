@@ -10,3 +10,18 @@ background-opacity = 0.985
 
 # New tabs inherit the working directory of the current tab
 window-inherit-working-directory = true
+
+# Ctrl+1..9 → tmux prefix (C-s, \x13) + digit, so tmux's default `prefix N`
+# binding switches to window N without a visible prefix press.
+# NOTE: outside tmux this sends Ctrl-S (XOFF) + digit, which would freeze
+# a bare shell's output until Ctrl-Q. Mitigated by `stty -ixon` in
+# dotfiles/zsh/core.zsh. Keep tmux prefix and these bytes in sync.
+keybind = ctrl+one=text:\x13\x31
+keybind = ctrl+two=text:\x13\x32
+keybind = ctrl+three=text:\x13\x33
+keybind = ctrl+four=text:\x13\x34
+keybind = ctrl+five=text:\x13\x35
+keybind = ctrl+six=text:\x13\x36
+keybind = ctrl+seven=text:\x13\x37
+keybind = ctrl+eight=text:\x13\x38
+keybind = ctrl+nine=text:\x13\x39

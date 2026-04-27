@@ -16,6 +16,12 @@ setopt auto_cd              # type a dir name to cd into it
 setopt interactivecomments  # allow # comments in terminal
 export EDITOR="nvim"
 
+# Disable XON/XOFF flow control so Ctrl-S doesn't freeze the terminal.
+# Required because Ghostty's `ctrl+<digit>` keybinds emit \x13 (Ctrl-S) +
+# digit to drive tmux window switching; without this, pressing Ctrl+1..9
+# outside tmux would pause output until Ctrl-Q.
+[[ -t 0 ]] && stty -ixon 2>/dev/null
+
 # --- Aliases ---
 alias cat="bat --paging=never"
 alias lg="lazygit"
