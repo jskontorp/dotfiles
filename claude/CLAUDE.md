@@ -15,4 +15,8 @@ Skills opt out of Claude with `claude-compatible: false` in their frontmatter (p
 
 Several side-effect skills carry `disable-model-invocation: true` — Claude won't auto-pick them on description match; they must be triggered explicitly via slash-command (e.g. `/commit`). Applied to `commit`, `create-pr`, `interactive-rebase`, `sandbox` as belt-and-suspenders against a false-positive description match causing an unwanted commit / push / history rewrite / container spin-up. Pi ignores the field and dispatches by description as usual.
 
+## Destructive actions
+
+The shared AGENTS.md `# Destructive actions` section is the policy and applies fully. Claude-specific: the `Bash` tool is the main vector. If a call is blocked by the harness's permission layer, report the denial and stop — do not retry with quoting tricks (`bash -c "…"`), wrapper commands, alternative shells, or by writing a script file and executing it. The deny is the user's standing policy, not a puzzle to route around.
+
 @$DOTFILES/pi/agent/AGENTS.md
