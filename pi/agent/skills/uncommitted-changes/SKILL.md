@@ -30,7 +30,14 @@ If all three commands return no files, **stop here** — this skill does not app
 
 ### 2. Read and Analyse Each File
 
-For every changed file:
+**First, load project rules:**
+
+- Read `AGENTS.md` and `CLAUDE.md` from the repo root if they exist. Follow any `@path` imports they declare.
+- Read `ARCHITECTURE.md` from the repo root unless one of the above already `@`-imports it (skip the duplicate read in that case).
+
+These rules inform what counts as a consistency violation in Step 3 — flag any deviation from AGENTS.md / CLAUDE.md / ARCHITECTURE.md guidance explicitly under 📐 **Project rule** in the findings.
+
+**Then, for every changed file:**
 
 1. Read the full file contents.
 2. Identify issues in the categories below.
