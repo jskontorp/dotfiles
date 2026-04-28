@@ -119,6 +119,14 @@
       "sourceUrl": "https://github.com/obra/superpowers",
       "skillPath": "skills/finishing-a-development-branch/SKILL.md",
       "skillFolderHash": "b55764852ac78870e65c6565fb585b6cd8b3c5c9"
+    },
+    "langfuse": {
+      "source": "langfuse/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/langfuse/skills",
+      "skillPath": "skills/langfuse/SKILL.md",
+      "skillFolderHash": "af1aaf673239c48d7cdc1898a80b713695afbb33",
+      "scope": "project:volve-ai"
     }
   },
   "dismissed": {
