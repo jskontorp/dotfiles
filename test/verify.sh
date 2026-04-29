@@ -147,13 +147,22 @@ run_test() {
     'dexec bash -c "! grep -q \"\\\\\$DOTFILES\" /home/testuser/.claude/CLAUDE.md"'
   check "imported AGENTS.md exists at the substituted path" \
     'dexec test -f /home/testuser/dotfiles/pi/agent/AGENTS.md'
-  check "\$HOME/.claude/skills/ has 8 live symlinks" \
-    'dexec bash -c "[[ \$(find ~/.claude/skills -maxdepth 1 -type l | wc -l) -eq 8 ]]"'
-  for s in commit create-pr gh-cli interactive-rebase prepare-merge sandbox step-back uncommitted-changes; do
-    check "mirrored: $s"  "dexec test -L /home/testuser/.claude/skills/$s"
-  done
-  for s in delegate linear-issue notion-write solve-ticket; do
-    check "excluded: $s"  "dexec bash -c \"! test -e /home/testuser/.claude/skills/$s\""
+  # Mirror invariant: each skill in pi/agent/skills/ is mirrored to
+  # ~/.claude/skills/ unless its SKILL.md frontmatter sets
+  # `claude-compatible: false`. Derived from frontmatter so adding/removing
+  # a skill doesn't require touching this test.
+  for skill_dir in "$DOTFILES/pi/agent/skills"/*/; do
+    [[ -d "$skill_dir" ]] || continue
+    name="$(basename "$skill_dir")"
+    skill_md="$skill_dir/SKILL.md"
+    [[ -f "$skill_md" ]] || continue
+    if grep -Eq '^claude-compatible:[[:space:]]*false[[:space:]]*$' "$skill_md"; then
+      check "claude excluded: $name" \
+        "dexec bash -c \"! test -e /home/testuser/.claude/skills/$name\""
+    else
+      check "claude mirrored: $name" \
+        "dexec test -L /home/testuser/.claude/skills/$name"
+    fi
   done
 
   # --- Claude Code agents (~/.claude/agents/) ---
