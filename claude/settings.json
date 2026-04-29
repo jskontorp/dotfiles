@@ -89,5 +89,18 @@
     "pyright-lsp@claude-plugins-official": true,
     "superpowers@claude-plugins-official": true
   },
-  "theme": "auto"
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/skills/session-scan/scan.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "theme": "auto",
+  "skipAutoPermissionPrompt": true
 }
