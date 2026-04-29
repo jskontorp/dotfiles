@@ -127,6 +127,13 @@
       "skillPath": "skills/langfuse/SKILL.md",
       "skillFolderHash": "af1aaf673239c48d7cdc1898a80b713695afbb33",
       "scope": "project:volve-ai"
+    },
+    "executing-plans": {
+      "source": "obra/superpowers",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/obra/superpowers",
+      "skillPath": "skills/executing-plans/SKILL.md",
+      "skillFolderHash": "6efe32c9e2dd002d0c394e861e0529675d1ab32e"
     }
   },
   "dismissed": {
