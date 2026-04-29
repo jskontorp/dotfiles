@@ -1,16 +1,27 @@
 #!/bin/bash
-# Pre-commit hook: shellcheck on staged .sh files.
+# Pre-commit hook: shellcheck on staged .sh files + `just check` (justfile
+# parity, manifest integrity, bash portability).
 # Symlinked into .git/hooks/ by install.sh.
 set -euo pipefail
 
-if ! command -v shellcheck &>/dev/null; then
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+
+# --- shellcheck staged shell files ---
+if command -v shellcheck &>/dev/null; then
+  files=()
+  while IFS= read -r f; do files+=("$f"); done < <(git diff --cached --name-only --diff-filter=ACM -- '*.sh')
+  if [[ ${#files[@]} -gt 0 ]]; then
+    printf "shellcheck: %d file(s)\n" "${#files[@]}"
+    shellcheck -S warning "${files[@]}"
+  fi
+else
   printf "⚠ shellcheck not installed — skipping lint (brew install shellcheck)\n" >&2
-  exit 0
 fi
 
-files=()
-while IFS= read -r f; do files+=("$f"); done < <(git diff --cached --name-only --diff-filter=ACM -- '*.sh')
-[[ ${#files[@]} -eq 0 ]] && exit 0
-
-printf "shellcheck: %d file(s)\n" "${#files[@]}"
-shellcheck -S warning "${files[@]}"
+# --- just check (sub-second host-side suite) ---
+if command -v just &>/dev/null; then
+  ( cd "$REPO_ROOT" && just check >/dev/null ) || {
+    printf "❌ just check failed — run \`just check\` to see details\n" >&2
+    exit 1
+  }
+fi
