@@ -321,6 +321,20 @@ skills:
     print()
     print(f"({len(entries)} skills tracked by dotfiles. Pi sessions also load skills shipped by installed pi packages, e.g. setup-oauth + workspace-explorer from @feniix/pi-notion.)")
 
+# Fast host-side checks: justfile parity, manifest integrity, bash-portability.
+# Sub-second; safe to run before every commit. For the full Docker integration
+# suite, use `just test`.
+[group('test')]
+check:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    printf "justfile:\n"
+    bash {{DOTFILES}}/test/check-justfile.sh
+    printf "\nmanifest:\n"
+    bash {{DOTFILES}}/test/validate-manifest.sh
+    printf "\nbash portability:\n"
+    bash {{DOTFILES}}/test/check-bash-portability.sh
+
 # Run dotfiles install validation in Docker (full integration). For fast
 # skill unit tests, use `just test-skills` / `just test-skill <name>`.
 [group('test')]
