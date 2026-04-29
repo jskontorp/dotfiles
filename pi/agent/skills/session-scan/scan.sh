@@ -36,19 +36,8 @@ _is_agent_cmd() {
   esac
 }
 
-# Resolve a PID's cwd. Echoes empty string on failure.
-_pid_cwd() {
-  local pid="$1"
-  local proc_dir="${SESSION_SCAN_PROC_DIR:-/proc}"
-  if [ -n "$pid" ] && [ -e "$proc_dir/$pid/cwd" ]; then
-    readlink "$proc_dir/$pid/cwd" 2>/dev/null
-    return
-  fi
-  if _have lsof; then
-    # -a ANDs the filters (default is OR on BSD lsof). -Fn prints just the name field.
-    lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | awk '/^n/{print substr($0,2); exit}'
-  fi
-}
+# Returns 0 if path $1 equals or is nested under prefix $2.
+_path_under() { case "$1" in "$2"|"$2"/*) return 0 ;; *) return 1 ;; esac; }
 
 # Walk parent chain of a PID. Echoes the chain (one PID per line) including the
 # starting PID. Stops at PID 1 or when ps fails.
@@ -135,11 +124,11 @@ fi
 # Branch + ahead/behind (first line of `git status -sb`).
 BRANCH_LINE=$(cd "$GIT_TOP" && git status -sb 2>/dev/null | head -1)
 # Strip leading "## ".
-BRANCH_LINE="${BRANCH_LINE## }"
 BRANCH_LINE="${BRANCH_LINE#\#\# }"
 
-# Clean / dirty.
-if [ -z "$(cd "$GIT_TOP" && git status --porcelain 2>/dev/null)" ]; then
+# Clean / dirty. Cache porcelain output once — reused by the DIRTY section below.
+status_porcelain=$(cd "$GIT_TOP" && git status --porcelain 2>/dev/null || true)
+if [ -z "$status_porcelain" ]; then
   CLEAN_MARK="clean"
 else
   CLEAN_MARK="dirty"
@@ -238,6 +227,7 @@ _render_wt_row() {
   echo "  ${marker}${p} (${b})${extras}"
 }
 
+# Show current worktree + first 5 others; truncate the rest into a summary line.
 if [ "$WT_COUNT" -le 6 ]; then
   i=0
   while [ "$i" -lt "$WT_COUNT" ]; do
@@ -287,9 +277,10 @@ if [ -n "${TMUX:-}" ] && _have tmux; then
     while [ "$j" -lt "$WT_COUNT" ]; do
       wt_path="${WT_PATHS[$j]}"
       # Prefix match — a pane in /repo/app/foo matches worktree /repo.
-      case "$pane_cwd" in
-        "$wt_path"|"$wt_path"/*) matched=1; break ;;
-      esac
+      if _path_under "$pane_cwd" "$wt_path"; then
+        matched=1
+        break
+      fi
       j=$((j + 1))
     done
     if [ "$matched" = "1" ]; then
@@ -312,12 +303,10 @@ EOF
     # plus annotation for sibling claude/pi.
     while IFS= read -r row; do
       [ -z "$row" ] && continue
-      addr=$(printf '%s' "$row" | awk -F'|' '{print $1}')
-      pid=$(printf '%s' "$row" | awk -F'|' '{print $2}')
-      pane_cwd=$(printf '%s' "$row" | awk -F'|' '{print $3}')
-      cmd=$(printf '%s' "$row" | awk -F'|' '{print $4}')
-      title=$(printf '%s' "$row" | awk -F'|' '{print $5}')
-      pid_field=$(printf '%s' "$row" | awk -F'|' '{print $6}')
+      # Split the 6 |-separated tmux fields in one shot. Field order matches the
+      # `tmux list-panes -F` format string above:
+      #   addr | pane_pid | pane_current_path | pane_current_command | pane_title | pane_id
+      IFS='|' read -r addr pid pane_cwd cmd title pid_field <<<"$row"
 
       # Current pane marker — match the per-row pane_id against $TMUX_PANE.
       cur_marker="  "
@@ -329,7 +318,7 @@ EOF
       annotation=""
       if _is_agent_cmd "$cmd"; then
         # Same worktree?
-        if [ "$pane_cwd" = "$GIT_TOP" ] || case "$pane_cwd" in "$GIT_TOP"/*) true;; *) false;; esac then
+        if _path_under "$pane_cwd" "$GIT_TOP"; then
           annotation="  ⚠ SAME WORKTREE"
         else
           annotation="  (sibling)"
@@ -470,7 +459,7 @@ EOF
     i=$((i + 1))
     [ -z "$pcwd" ] && continue
 
-    if [ "$pcwd" = "$GIT_TOP" ] || case "$pcwd" in "$GIT_TOP"/*) true;; *) false;; esac then
+    if _path_under "$pcwd" "$GIT_TOP"; then
       same_worktree_count=$((same_worktree_count + 1))
       addr=""
       if [ -n "$TMUX_PID_MAP" ]; then
@@ -486,11 +475,9 @@ EOF
       j=0
       while [ "$j" -lt "$WT_COUNT" ]; do
         wt="${WT_PATHS[$j]}"
-        if [ "$wt" != "$GIT_TOP" ]; then
-          if [ "$pcwd" = "$wt" ] || case "$pcwd" in "$wt"/*) true;; *) false;; esac then
-            in_sibling=1
-            break
-          fi
+        if [ "$wt" != "$GIT_TOP" ] && _path_under "$pcwd" "$wt"; then
+          in_sibling=1
+          break
         fi
         j=$((j + 1))
       done
@@ -530,7 +517,9 @@ if [ "$CLEAN_MARK" = "dirty" ]; then
         recent_files+=("$fname")
         ;;
     esac
-  done < <(cd "$GIT_TOP" && git status --porcelain 2>/dev/null)
+  done <<EOF
+$status_porcelain
+EOF
 
   # Find newest mtime among recent_files.
   newest=0

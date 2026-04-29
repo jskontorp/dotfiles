@@ -92,7 +92,7 @@ test_top_3_paths_listed() {
       count=$((count + 1))
     fi
   done
-  if [ "$count" -ge 3 ] && [ "$count" -le 3 ]; then
+  if [ "$count" -eq 3 ]; then
     pass "exactly 3 files listed in DIRTY line"
   else
     fail "expected 3 files in DIRTY line, got $count"
