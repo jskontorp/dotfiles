@@ -1,12 +1,18 @@
 #!/bin/bash
 # Validate that every entry in .install-manifest is a working symlink.
-# Also detects symlinks pointing into ~/dotfiles that bypassed the manifest
-# (raw ln calls that should use _link/_linkd).
+# Also detects symlinks pointing into the dotfiles repo that bypassed the
+# manifest (raw ln calls that should use _link/_linkd).
 #
 # Usage: bash test/validate-manifest.sh
+#
+# Resolves the repo root from the script's own location, so it runs both
+# inside the Docker test (~/dotfiles) and on a host where the repo lives
+# elsewhere (e.g. ~/code/personal/dotfiles).
 set -uo pipefail
 
-MANIFEST="$HOME/dotfiles/.install-manifest"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+MANIFEST="$REPO_DIR/.install-manifest"
 
 if [[ ! -f "$MANIFEST" ]]; then
   printf "  ❌ no manifest at %s\n" "$MANIFEST" >&2
@@ -60,14 +66,14 @@ done
 orphans=0
 while IFS= read -r link; do
   target=$(readlink "$link" 2>/dev/null || true)
-  # Only care about links whose target is inside ~/dotfiles
-  [[ "$target" == "$HOME/dotfiles/"* ]] || continue
+  # Only care about links whose target is inside the dotfiles repo
+  [[ "$target" == "$REPO_DIR/"* ]] || continue
   # Check if it's in the manifest
   if ! grep -qxF "$link" "$MANIFEST"; then
     printf "  ⚠️  UNTRACKED: %s → %s\n" "${link#"$HOME"/}" "${target#"$HOME"/}"
     orphans=$((orphans + 1))
   fi
-done < <(find "$HOME" -maxdepth 5 -type l -not -path "$HOME/dotfiles/*" 2>/dev/null)
+done < <(find "$HOME" -maxdepth 5 -type l -not -path "$REPO_DIR/*" 2>/dev/null)
 
 if [[ $orphans -gt 0 ]]; then
   printf "  ❌ %d symlink(s) bypass the manifest (use _link/_linkd in install.sh)\n" "$orphans"
