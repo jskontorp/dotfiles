@@ -95,11 +95,23 @@ test_locked_flag() {
   assert_contains "$out" "[locked]" "locked flag rendered"
 }
 
+test_prunable_worktree_flag() {
+  local repo; repo=$(make_main_repo prunable-test)
+  add_worktrees "$repo" 1
+  # A worktree whose checkout directory has been removed is reported as
+  # prunable by `git worktree list --porcelain`.
+  rm -rf "$repo-wt-1"
+  local out
+  out=$( cd "$repo" && unset TMUX TMUX_PANE; "$SCRIPT" 2>&1 )
+  assert_contains "$out" "[prunable]" "prunable flag rendered"
+}
+
 # ---- runner ----
 
 run_test "single worktree"           test_single_worktree
 run_test "three worktrees"           test_three_worktrees_current_marked
 run_test "eight worktrees truncate"  test_eight_worktrees_truncated
 run_test "locked flag"               test_locked_flag
+run_test "prunable flag"             test_prunable_worktree_flag
 
 summary

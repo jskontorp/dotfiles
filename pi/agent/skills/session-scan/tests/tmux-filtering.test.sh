@@ -102,11 +102,125 @@ test_pane_in_subdirectory_matches_via_prefix() {
   assert_contains "$out" "$sub" "subdirectory path rendered"
 }
 
+# Pull just the line for a given pane address out of $1.
+_pane_line() {
+  local out="$1" addr="$2"
+  printf '%s\n' "$out" | grep -F "$addr"
+}
+
+test_pane_with_claude_in_same_worktree_marked() {
+  local repo; repo=$(make_main_repo same-wt)
+  # Format: addr|pid|cwd|cmd|title|pane_id
+  printf '%s\n' "main:1.0|11111|$repo|claude|claude|%0" > "$TMP/panes.txt"
+  make_tmux_stub "$TMP/panes.txt"
+  local out
+  out=$( cd "$repo" && export TMUX="/tmp/fake,1,0" TMUX_PANE="%99"; "$SCRIPT" 2>&1 )
+  local line; line=$(_pane_line "$out" "main:1.0")
+  assert_contains "$line" "⚠ SAME WORKTREE" "claude in current worktree gets ⚠ SAME WORKTREE"
+}
+
+test_pane_with_pi_in_sibling_worktree_softly_marked() {
+  local repo; repo=$(make_main_repo sib-pi)
+  ( cd "$repo" && git worktree add -q -b feature "$repo-feature" )
+  local sibling="$repo-feature"
+  printf '%s\n' "main:1.1|22222|$sibling|pi|pi|%1" > "$TMP/panes.txt"
+  make_tmux_stub "$TMP/panes.txt"
+  local out
+  out=$( cd "$repo" && export TMUX="/tmp/fake,1,0" TMUX_PANE="%99"; "$SCRIPT" 2>&1 )
+  local line; line=$(_pane_line "$out" "main:1.1")
+  assert_contains "$line" "(sibling)" "pi in sibling worktree gets (sibling)"
+  if printf '%s' "$line" | grep -q "⚠"; then
+    fail "sibling pi line should not contain ⚠"
+  else
+    pass "sibling pi line does not contain ⚠"
+  fi
+}
+
+test_pane_with_unrelated_command_unmarked() {
+  local repo; repo=$(make_main_repo plain-zsh)
+  printf '%s\n' "main:1.0|11111|$repo|zsh|zsh|%0" > "$TMP/panes.txt"
+  make_tmux_stub "$TMP/panes.txt"
+  local out
+  out=$( cd "$repo" && export TMUX="/tmp/fake,1,0" TMUX_PANE="%99"; "$SCRIPT" 2>&1 )
+  local line; line=$(_pane_line "$out" "main:1.0")
+  if printf '%s' "$line" | grep -q "⚠ SAME WORKTREE"; then
+    fail "zsh line unexpectedly marked SAME WORKTREE"
+  else
+    pass "zsh line not marked SAME WORKTREE"
+  fi
+  if printf '%s' "$line" | grep -q "(sibling)"; then
+    fail "zsh line unexpectedly marked (sibling)"
+  else
+    pass "zsh line not marked (sibling)"
+  fi
+}
+
+test_current_pane_marker() {
+  local repo; repo=$(make_main_repo cur-pane)
+  printf '%s\n' \
+    "main:1.0|11111|$repo|zsh|zsh|%0" \
+    "main:1.1|22222|$repo|zsh|zsh|%99" \
+    > "$TMP/panes.txt"
+  make_tmux_stub "$TMP/panes.txt"
+  local out
+  out=$( cd "$repo" && export TMUX="/tmp/fake,1,0" TMUX_PANE="%99"; "$SCRIPT" 2>&1 )
+  local cur_line other_line
+  cur_line=$(_pane_line "$out" "main:1.1")
+  other_line=$(_pane_line "$out" "main:1.0")
+  # Current pane marker is "* " at start of the rendered row body.
+  if printf '%s' "$cur_line" | grep -qE "^  \* main:1\.1"; then
+    pass "current pane (TMUX_PANE=%99) marked with *"
+  else
+    fail "current pane not marked with * (line: $cur_line)"
+  fi
+  if printf '%s' "$other_line" | grep -qE "^  \* main:1\.0"; then
+    fail "non-current pane unexpectedly marked with *"
+  else
+    pass "non-current pane not marked"
+  fi
+}
+
+test_loose_match_excluded() {
+  local repo; repo=$(make_main_repo loose-claude)
+  printf '%s\n' "main:1.0|11111|$repo|claude-runner|claude-runner|%0" > "$TMP/panes.txt"
+  make_tmux_stub "$TMP/panes.txt"
+  local out
+  out=$( cd "$repo" && export TMUX="/tmp/fake,1,0" TMUX_PANE="%99"; "$SCRIPT" 2>&1 )
+  local line; line=$(_pane_line "$out" "main:1.0")
+  if printf '%s' "$line" | grep -q "⚠ SAME WORKTREE"; then
+    fail "claude-runner unexpectedly matched as agent (got ⚠ SAME WORKTREE)"
+  else
+    pass "claude-runner not flagged as agent"
+  fi
+}
+
+test_loose_match_excluded_mpi() {
+  local repo; repo=$(make_main_repo loose-mpi)
+  ( cd "$repo" && git worktree add -q -b feature "$repo-feature" )
+  local sibling="$repo-feature"
+  printf '%s\n' "main:1.0|11111|$sibling|mpi|mpi|%0" > "$TMP/panes.txt"
+  make_tmux_stub "$TMP/panes.txt"
+  local out
+  out=$( cd "$repo" && export TMUX="/tmp/fake,1,0" TMUX_PANE="%99"; "$SCRIPT" 2>&1 )
+  local line; line=$(_pane_line "$out" "main:1.0")
+  if printf '%s' "$line" | grep -q "(sibling)"; then
+    fail "mpi unexpectedly matched as agent (got (sibling))"
+  else
+    pass "mpi not flagged as agent"
+  fi
+}
+
 # ---- runner ----
 
-run_test "pane in main worktree"        test_pane_in_main_worktree_included
-run_test "pane in sibling worktree"     test_pane_in_sibling_worktree_included
-run_test "pane in unrelated repo"       test_pane_in_unrelated_repo_excluded
-run_test "pane in subdirectory"         test_pane_in_subdirectory_matches_via_prefix
+run_test "pane in main worktree"           test_pane_in_main_worktree_included
+run_test "pane in sibling worktree"        test_pane_in_sibling_worktree_included
+run_test "pane in unrelated repo"          test_pane_in_unrelated_repo_excluded
+run_test "pane in subdirectory"            test_pane_in_subdirectory_matches_via_prefix
+run_test "claude same worktree marked"     test_pane_with_claude_in_same_worktree_marked
+run_test "pi sibling worktree softmarked"  test_pane_with_pi_in_sibling_worktree_softly_marked
+run_test "unrelated command unmarked"      test_pane_with_unrelated_command_unmarked
+run_test "current pane marker"             test_current_pane_marker
+run_test "loose match claude-runner"       test_loose_match_excluded
+run_test "loose match mpi"                 test_loose_match_excluded_mpi
 
 summary

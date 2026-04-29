@@ -135,6 +135,76 @@ test_self_exclusion() {
   fi
 }
 
+# Stub `ps -o ppid= -p <PID>` to return a parent PID from a fixture map.
+# Fixture file format: "<child_pid> <parent_pid>" per line. Unknown PIDs
+# return empty (terminating the ancestry walk). Other ps invocations fall
+# through to the real ps on $ORIG_PATH so unrelated calls keep working.
+make_ps_ancestry_stub() {
+  local map_file="$1"
+  cp "$map_file" "$STUB_STATE_DIR/ps-ancestry.txt"
+  make_stub ps '
+# Detect the "-o ppid= -p <PID>" invocation used by _pid_ancestry.
+ppid_mode=0
+target=""
+prev=""
+for arg in "$@"; do
+  case "$prev$arg" in
+    "-o""ppid=") ppid_mode=1 ;;
+  esac
+  if [ "$prev" = "-p" ]; then
+    target="$arg"
+  fi
+  prev="$arg"
+done
+if [ "$ppid_mode" = "1" ] && [ -n "$target" ]; then
+  awk -v t="$target" "\$1==t {print \$2; exit}" "$STUB_STATE_DIR/ps-ancestry.txt"
+  exit 0
+fi
+# Anything else: defer to real ps on the unmodified PATH.
+PATH="$ORIG_PATH" exec ps "$@"
+'
+}
+
+test_self_exclusion_ancestor() {
+  local repo; repo=$(make_main_repo selfex-anc)
+  # Ancestry: 12345 → 67890 → 11111 → (stops). Plus an unrelated 99999.
+  printf '%s\n' \
+    "12345 67890" \
+    "67890 11111" \
+    "11111 1" \
+    "99999 1" \
+    > "$TMP/ps-map.txt"
+  make_ps_ancestry_stub "$TMP/ps-map.txt"
+  # All four candidates live in $repo so cwd resolution puts them in the same worktree.
+  local fake; fake=$(build_fake_proc \
+      "12345 $repo" \
+      "67890 $repo" \
+      "11111 $repo" \
+      "99999 $repo")
+  printf '%s\n' \
+    "12345 claude" \
+    "67890 claude" \
+    "11111 claude" \
+    "99999 claude" \
+    > "$TMP/pgrep.txt"
+  make_pgrep_stub "$TMP/pgrep.txt"
+  local out
+  out=$( cd "$repo" && unset TMUX TMUX_PANE; \
+         export SESSION_SCAN_PROC_DIR="$fake"; \
+         export SESSION_SCAN_OWN_PID=12345; \
+         "$SCRIPT" 2>&1 )
+  # Only 99999 is unrelated to the ancestry chain → exactly one sibling.
+  assert_contains "$out" "1 Claude/pi in same worktree" "ancestry chain excluded → only unrelated 99999 counted"
+  assert_contains "$out" "PID 99999" "unrelated PID 99999 reported"
+  for excluded in 12345 67890 11111; do
+    if printf '%s' "$out" | grep -q "PID $excluded"; then
+      fail "ancestor PID $excluded leaked into SIBLINGS"
+    else
+      pass "ancestor PID $excluded excluded from SIBLINGS"
+    fi
+  done
+}
+
 test_non_agent_processes_filtered_out() {
   local repo; repo=$(make_main_repo notagent)
   # pgrep's regex (claude|pi) matches "spider" and "tmux a -t pi-sessions" too.
@@ -161,6 +231,7 @@ run_test "sibling pi in same worktree"          test_sibling_pi_same_worktree
 run_test "sibling in sibling worktree"          test_sibling_in_sibling_worktree
 run_test "sibling in unrelated path"            test_sibling_in_unrelated_path_excluded
 run_test "self-exclusion"                       test_self_exclusion
+run_test "self-exclusion ancestor chain"        test_self_exclusion_ancestor
 run_test "non-agent processes filtered"         test_non_agent_processes_filtered_out
 
 summary

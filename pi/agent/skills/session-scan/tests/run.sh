@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run all solve-ticket script tests. Exits non-zero if any file failed.
+# Run all session-scan script tests. Exits non-zero if any file failed.
 set -u
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -15,7 +15,7 @@ for t in "$HERE"/*.test.sh; do
 done
 
 echo ""
-echo "================ solve-ticket tests ================"
+echo "================ session-scan tests ================"
 if [ "${#failures[@]}" -eq 0 ]; then
   echo "✅ all test files passed"
   exit 0

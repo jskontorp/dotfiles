@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# helpers.sh — sandbox + assert helpers for solve-ticket script tests.
+# helpers.sh — sandbox + assert helpers for session-scan script tests.
 # Sourced by each *.test.sh. Target: ≤200 LOC (trigger for re-evaluating bats).
 
 # Caller must set SCRIPTS_DIR before sourcing.
@@ -50,7 +50,7 @@ assert_file_absent() {
 # ----- sandbox -----
 
 setup_sandbox() {
-  TMP=$(mktemp -d 2>/dev/null || mktemp -d -t solve-ticket-test)
+  TMP=$(mktemp -d 2>/dev/null || mktemp -d -t session-scan-test)
   export TMP
   export SANDBOX_HOME="$TMP/home"
   export STUB_DIR="$TMP/stubs"

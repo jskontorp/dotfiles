@@ -17,6 +17,25 @@ set -u
 
 _have() { command -v "$1" >/dev/null 2>&1; }
 
+# Returns 0 if the given command-string identifies a `claude` or `pi` agent
+# process. Accepts the first whitespace-separated token (or a single command
+# name like tmux's pane_current_command) and tests its basename against an
+# exact-match allowlist. Rejects loose matches like `claude-runner`, `mpi`,
+# `spider-claude`, or `tmux a -t pi-sessions`.
+_is_agent_cmd() {
+  local raw="$1"
+  [ -z "$raw" ] && return 1
+  local first_tok
+  first_tok=$(printf '%s' "$raw" | awk '{print $1}')
+  [ -z "$first_tok" ] && return 1
+  local base
+  base=$(basename "$first_tok" 2>/dev/null)
+  case "$base" in
+    claude|pi) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 # Resolve a PID's cwd. Echoes empty string on failure.
 _pid_cwd() {
   local pid="$1"
@@ -308,16 +327,14 @@ EOF
 
       # Sibling-agent annotation.
       annotation=""
-      case "$cmd" in
-        *claude*|*pi)
-          # Same worktree?
-          if [ "$pane_cwd" = "$GIT_TOP" ] || case "$pane_cwd" in "$GIT_TOP"/*) true;; *) false;; esac then
-            annotation="  ⚠ SAME WORKTREE"
-          else
-            annotation="  (sibling)"
-          fi
-          ;;
-      esac
+      if _is_agent_cmd "$cmd"; then
+        # Same worktree?
+        if [ "$pane_cwd" = "$GIT_TOP" ] || case "$pane_cwd" in "$GIT_TOP"/*) true;; *) false;; esac then
+          annotation="  ⚠ SAME WORKTREE"
+        else
+          annotation="  (sibling)"
+        fi
+      fi
 
       echo "  ${cur_marker}${addr} | ${pane_cwd} | ${cmd} | ${title}${annotation}"
     done <<EOF
@@ -361,15 +378,12 @@ if _have pgrep; then
     [ "$skip" = "1" ] && continue
 
     # Validate the matched process is actually `claude` or `pi`, not "spider" or
-    # "tmux a -t pi-sessions". `pgrep -lf` prints "PID first-token [rest]" — we
-    # accept the line iff the basename of `first-token` is `claude` or `pi`.
-    first_tok=$(printf '%s' "$line" | awk '{print $2}')
-    [ -z "$first_tok" ] && continue
+    # "tmux a -t pi-sessions". `pgrep -lf` prints "PID first-token [rest]" — strip
+    # the PID and run the rest through the shared agent-detection helper.
+    cmd_str=$(printf '%s' "$line" | awk '{$1=""; sub(/^ /, ""); print}')
+    _is_agent_cmd "$cmd_str" || continue
+    first_tok=$(printf '%s' "$cmd_str" | awk '{print $1}')
     comm_base=$(basename "$first_tok" 2>/dev/null)
-    case "$comm_base" in
-      claude|pi) ;;
-      *) continue ;;
-    esac
     cand_pids+=("$pid")
     cand_names+=("$comm_base")
   done < <(pgrep -lf '(claude|pi)' 2>/dev/null)

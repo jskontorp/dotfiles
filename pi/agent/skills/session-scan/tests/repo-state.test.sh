@@ -69,6 +69,22 @@ test_inflight_merge() {
   assert_contains "$out" "inflight: merge" "MERGE_HEAD → inflight: merge"
 }
 
+test_inflight_cherry_pick() {
+  local repo; repo=$(make_repo cherry-repo)
+  : > "$repo/.git/CHERRY_PICK_HEAD"
+  local out
+  out=$( cd "$repo" && unset TMUX TMUX_PANE; "$SCRIPT" 2>&1 )
+  assert_contains "$out" "inflight: cherry-pick" "CHERRY_PICK_HEAD → inflight: cherry-pick"
+}
+
+test_inflight_bisect() {
+  local repo; repo=$(make_repo bisect-repo)
+  : > "$repo/.git/BISECT_LOG"
+  local out
+  out=$( cd "$repo" && unset TMUX TMUX_PANE; "$SCRIPT" 2>&1 )
+  assert_contains "$out" "inflight: bisect" "BISECT_LOG → inflight: bisect"
+}
+
 test_index_lock_present() {
   local repo; repo=$(make_repo lock-repo)
   : > "$repo/.git/index.lock"
@@ -92,6 +108,8 @@ run_test "REPO section dirty"        test_repo_section_dirty
 run_test "inflight rebase"           test_inflight_rebase
 run_test "inflight none"             test_inflight_none
 run_test "inflight merge"            test_inflight_merge
+run_test "inflight cherry-pick"      test_inflight_cherry_pick
+run_test "inflight bisect"           test_inflight_bisect
 run_test "index.lock present"        test_index_lock_present
 run_test "index.lock absent"         test_index_lock_absent
 
