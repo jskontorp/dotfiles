@@ -58,11 +58,18 @@ for skill in "$DOTFILES/pi/agent/skills"/*/; do
   _linkd "$skill" ~/.pi/agent/skills/"$(basename "$skill")"
 done
 
-# pi extensions: symlink each .ts file into ~/.pi/agent/extensions/
+# pi extensions: symlink each .ts file into ~/.pi/agent/extensions/.
+# Skip .d.ts (type-declaration only — no runtime export, pi rejects them
+# at load time with "does not export a valid factory function").
+# Prune any stale .d.ts symlink left behind by previous installs.
 if [[ -d "$DOTFILES/pi/agent/extensions" ]]; then
   mkdir -p ~/.pi/agent/extensions
+  for stale in ~/.pi/agent/extensions/*.d.ts; do
+    [[ -L "$stale" ]] && rm "$stale"
+  done
   for ext in "$DOTFILES/pi/agent/extensions"/*.ts; do
     [[ ! -f "$ext" ]] && continue
+    [[ "$ext" == *.d.ts ]] && continue
     _link "$ext" ~/.pi/agent/extensions/"$(basename "$ext")"
   done
 fi
