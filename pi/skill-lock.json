@@ -6,7 +6,7 @@
       "sourceType": "github",
       "sourceUrl": "https://github.com/vercel-labs/skills.git",
       "skillPath": "skills/find-skills/SKILL.md",
-      "skillFolderHash": "3013fdeb8a11b10b1eb795ec3ae8bfca38f7c26d",
+      "skillFolderHash": "7c0a9af3f8738965b71341712710ac7371089b34",
       "installedAt": "2026-03-11T08:39:25.536Z",
       "updatedAt": "2026-04-08T13:41:35.000Z"
     },
@@ -15,7 +15,7 @@
       "sourceType": "github",
       "sourceUrl": "https://github.com/vercel-labs/agent-skills.git",
       "skillPath": "skills/react-best-practices/SKILL.md",
-      "skillFolderHash": "a203aee7243640ceb56ce2c6c4ab286573df5e69",
+      "skillFolderHash": "ce3e64e468f8fa09a2d075d102771838061fdac0",
       "installedAt": "2026-04-08T13:47:13.830Z",
       "updatedAt": "2026-04-08T13:55:39.223Z"
     },
@@ -24,7 +24,7 @@
       "sourceType": "github",
       "sourceUrl": "https://github.com/vercel-labs/agent-skills.git",
       "skillPath": "skills/web-design-guidelines/SKILL.md",
-      "skillFolderHash": "3116f3e62dbd02b44a598b1aa690d2a8938e8f89",
+      "skillFolderHash": "ce3e64e468f8fa09a2d075d102771838061fdac0",
       "installedAt": "2026-04-08T13:49:40.428Z",
       "updatedAt": "2026-04-08T13:49:40.428Z"
     },
@@ -33,7 +33,7 @@
       "sourceType": "github",
       "sourceUrl": "https://github.com/anthropics/skills.git",
       "skillPath": "skills/webapp-testing/SKILL.md",
-      "skillFolderHash": "74cb751576f9e9af2aedff47e67861ef26db2dc4",
+      "skillFolderHash": "5128e1865d670f5d6c9cef000e6dfc4e951fb5b9",
       "pluginName": "example-skills",
       "installedAt": "2026-04-09T08:47:25.108Z",
       "updatedAt": "2026-04-09T08:47:25.108Z"
@@ -43,7 +43,7 @@
       "sourceType": "github",
       "sourceUrl": "https://github.com/obra/superpowers.git",
       "skillPath": "skills/systematic-debugging/SKILL.md",
-      "skillFolderHash": "828c239ac986cc1fc7edd10292f66e4a3640e9c0",
+      "skillFolderHash": "6efe32c9e2dd002d0c394e861e0529675d1ab32e",
       "installedAt": "2026-04-09T08:47:22.022Z",
       "updatedAt": "2026-04-09T08:47:22.022Z"
     },
@@ -52,7 +52,7 @@
       "sourceType": "github",
       "sourceUrl": "https://github.com/wshobson/agents.git",
       "skillPath": "plugins/javascript-typescript/skills/typescript-advanced-types/SKILL.md",
-      "skillFolderHash": "a2fe3beb2f08b66b467981df7e09a2ccc5c9c7d2",
+      "skillFolderHash": "c15b108a8d2fa853140b811e2dffdc30bd0ce788",
       "installedAt": "2026-04-09T08:47:27.924Z",
       "updatedAt": "2026-04-09T08:47:27.924Z"
     },
@@ -61,7 +61,7 @@
       "sourceType": "github",
       "sourceUrl": "https://github.com/addyosmani/web-quality-skills.git",
       "skillPath": "skills/accessibility/SKILL.md",
-      "skillFolderHash": "610035b217cff3f6e63b4d9edfe1e113ecebf5f6",
+      "skillFolderHash": "fed9617111260e19f4f54b72a2874a3f3de8ff94",
       "installedAt": "2026-04-09T08:50:47.269Z",
       "updatedAt": "2026-04-09T08:50:47.269Z"
     },
