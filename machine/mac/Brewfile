@@ -26,6 +26,7 @@ brew "neovim"
 brew "node"
 brew "pnpm"
 brew "just"
+brew "shellcheck"       # pre-commit lint for *.sh
 
 # GUI apps
 cask "ghostty"
