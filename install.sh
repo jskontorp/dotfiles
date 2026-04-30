@@ -13,6 +13,7 @@ INSTALL_MANIFEST="$DOTFILES/.install-manifest"
 
 # _link <target> <dest>  — symlink a file (if dest is a dir, link inside it)
 _link() {
+  [[ -e "$1" ]] || { printf "❌ install.sh: missing source %s (dest: %s)\n" "$1" "$2" >&2; exit 1; }
   ln -sf "$1" "$2"
   if [[ -d "$2" && ! -L "$2" ]]; then
     echo "${2%/}/$(basename "$1")" >> "$INSTALL_MANIFEST"
@@ -23,6 +24,7 @@ _link() {
 
 # _linkd <target> <dest> — symlink a directory (replaces existing)
 _linkd() {
+  [[ -e "$1" ]] || { printf "❌ install.sh: missing source %s (dest: %s)\n" "$1" "$2" >&2; exit 1; }
   rm -rf "$2"
   ln -sfn "$1" "$2"
   echo "$2" >> "$INSTALL_MANIFEST"
@@ -97,6 +99,7 @@ sed "s|\$DOTFILES|$DOTFILES|g" "$DOTFILES/claude/CLAUDE.md" > ~/.claude/CLAUDE.m
 # in sync automatically. Run `just claude-plugins-install` on a fresh machine
 # to materialise the enabledPlugins set via `claude plugin install`.
 _link "$DOTFILES/claude/settings.json" ~/.claude/settings.json
+_link "$DOTFILES/claude/statusline.sh" ~/.claude/statusline.sh
 
 for skill in "$DOTFILES/pi/agent/skills"/*/; do
   [[ ! -d "$skill" ]] && continue

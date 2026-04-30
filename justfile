@@ -8,7 +8,7 @@ MAC      := DOTFILES / "machine/mac"
 VM       := DOTFILES / "machine/vm"
 
 # Global pnpm packages — shared across mac and vm update recipes
-GLOBAL_PNPM := "@anthropic-ai/claude-code @mariozechner/pi-coding-agent pyright"
+GLOBAL_PNPM := "@anthropic-ai/claude-code @mariozechner/pi-coding-agent pyright typescript"
 
 # Tools that both platforms must report in `just status`.
 # Platform-specific tools (brew, fnm, docker, etc.) are added per-recipe.
@@ -334,6 +334,12 @@ check:
     bash {{DOTFILES}}/test/validate-manifest.sh
     printf "\nbash portability:\n"
     bash {{DOTFILES}}/test/check-bash-portability.sh
+    printf "\nextensions (typescript):\n"
+    if ! command -v tsc >/dev/null 2>&1; then
+      printf "  ❌ tsc not on PATH — ensure typescript is installed (run 'just update')\n" >&2
+      exit 1
+    fi
+    ( cd {{DOTFILES}}/pi/agent/extensions && tsc --noEmit ) && printf "  ✅ no type errors\n"
 
 # Run dotfiles install validation in Docker (full integration). For fast
 # skill unit tests, use `just test-skills` / `just test-skill <name>`.

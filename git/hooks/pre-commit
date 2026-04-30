@@ -24,4 +24,6 @@ if command -v just &>/dev/null; then
     printf "❌ just check failed — run \`just check\` to see details\n" >&2
     exit 1
   }
+else
+  printf "⚠ just not installed — skipping just check (run 'just init' or 'brew install just')\n" >&2
 fi
