@@ -8,7 +8,7 @@ Unified dev environment for macOS and Linux.
 bash <(curl -fsSL https://raw.githubusercontent.com/jskontorp/dotfiles/main/init.sh)
 ```
 
-Clones the repo to `~/dotfiles` and runs the full bootstrap:
+Clones the repo to `~/code/personal/dotfiles` and runs the full bootstrap:
 - **macOS** — installs Homebrew, all packages from Brewfile, tmux plugins, symlinks configs, prompts for git identity.
 - **Linux** — installs system packages, builds tools from source, sets up swap/SSH/firewall, installs Tailscale, symlinks configs.
 
@@ -17,7 +17,7 @@ After bootstrap, `just` is available for all future management.
 ## Keeping up to date
 
 ```bash
-cd ~/dotfiles && git pull
+cd ~/code/personal/dotfiles && git pull
 just link      # apply config changes (fast, idempotent)
 just update    # upgrade packages + install new additions (hits network)
 ```

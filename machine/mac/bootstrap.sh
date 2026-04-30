@@ -1,6 +1,6 @@
 #!/bin/bash
 # Bootstrap a fresh macOS dev environment from scratch.
-# Usage: git clone ... ~/dotfiles && cd ~/dotfiles && ./machine/mac/bootstrap.sh
+# Usage: git clone ... ~/code/personal/dotfiles && cd ~/code/personal/dotfiles && ./machine/mac/bootstrap.sh
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

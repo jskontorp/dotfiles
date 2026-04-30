@@ -7,13 +7,15 @@
 set -euo pipefail
 
 REPO="jskontorp/dotfiles"
-DEST="$HOME/dotfiles"
+DEST="$HOME/code/personal/dotfiles"
 
 if [[ -d "$DEST" ]]; then
-  echo "$HOME/dotfiles already exists. To update:"
-  echo "  cd ~/dotfiles && git pull && just link"
+  echo "$DEST already exists. To update:"
+  echo "  cd $DEST && git pull && just link"
   exit 1
 fi
+
+mkdir -p "$(dirname "$DEST")"
 
 # Ensure git is available
 if ! command -v git &>/dev/null; then

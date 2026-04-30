@@ -1,6 +1,6 @@
 #!/bin/bash
 # Bootstrap a fresh Ubuntu (aarch64) dev box from scratch.
-# Usage: git clone ... ~/dotfiles && cd ~/dotfiles && ./machine/vm/bootstrap.sh
+# Usage: git clone ... ~/code/personal/dotfiles && cd ~/code/personal/dotfiles && ./machine/vm/bootstrap.sh
 #
 # One-time OS setup (swap, SSH, firewall, shell plugins), then delegates all
 # tool installation to `just update` — the single source of truth for tools.
