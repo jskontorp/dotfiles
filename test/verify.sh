@@ -9,6 +9,12 @@ set -euo pipefail
 DOTFILES="$(cd "$(dirname "$0")/.." && pwd)"
 TARGET="${1:-both}"
 
+# PID suffix isolates parallel invocations of this script (e.g. `just test`
+# in one pane while `just test vm` runs in another) so they don't share a
+# container name and stomp each other's `docker rm -f`.
+RUN_ID=$$
+trap 'docker rm -f "dotfiles-verify-vm-$RUN_ID" "dotfiles-verify-mac-$RUN_ID" >/dev/null 2>&1 || true' EXIT INT TERM
+
 PASS=0
 FAIL=0
 
@@ -30,7 +36,7 @@ dexec() {
 run_test() {
   local machine="$1"
   local image="dotfiles-test-$machine"
-  CONTAINER="dotfiles-verify-$machine"
+  CONTAINER="dotfiles-verify-$machine-$RUN_ID"
 
   printf "\n=== Testing %s install ===\n\n" "$machine"
 
