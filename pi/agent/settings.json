@@ -3,7 +3,7 @@
   "defaultModel": "claude-opus-4.7",
   "defaultThinkingLevel": "medium",
   "hideThinkingBlock": false,
-  "lastChangelogVersion": "0.70.5",
+  "lastChangelogVersion": "0.70.6",
   "packages": [
     "npm:@fink-andreas/pi-linear-tools",
     "npm:@feniix/pi-notion"
