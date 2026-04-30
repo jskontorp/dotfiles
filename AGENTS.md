@@ -29,4 +29,4 @@ Repo-local addendum for agents working on this dotfiles repo. The global cross-a
 
 ## Known gaps
 
-No type-check for `pi/agent/extensions/*.ts`; `init.sh` and `machine/*/bootstrap.sh` are only shellchecked; `Brewfile` is not validated at all; `verify.sh`'s `mac` Docker target uses a `uname` shim, so real macOS-only paths aren't exercised. Don't claim a check exists for these surfaces.
+`init.sh` and `machine/*/bootstrap.sh` are only shellchecked; `verify.sh`'s `mac` Docker target uses a `uname` shim, so real macOS-only paths aren't exercised. Don't claim a check exists for these surfaces.

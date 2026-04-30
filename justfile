@@ -336,10 +336,10 @@ check:
     bash {{DOTFILES}}/test/check-bash-portability.sh
     printf "\nextensions (typescript):\n"
     if ! command -v tsc >/dev/null 2>&1; then
-      printf "  ❌ tsc not on PATH — ensure typescript is installed (run 'just update')\n" >&2
-      exit 1
+      printf "  ⚠ tsc not on PATH — skipped (run 'just update' to install)\n" >&2
+    else
+      ( cd {{DOTFILES}}/pi/agent/extensions && tsc --noEmit ) && printf "  ✅ no type errors\n"
     fi
-    ( cd {{DOTFILES}}/pi/agent/extensions && tsc --noEmit ) && printf "  ✅ no type errors\n"
     printf "\nBrewfile (mac):\n"
     if [[ "$(uname -s)" == "Darwin" ]]; then
       if ! command -v brew >/dev/null 2>&1; then

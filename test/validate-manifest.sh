@@ -49,6 +49,7 @@ EXPECTED=(
   "$HOME/.tmux.shared.conf"
   "$HOME/.tmux.conf"
   "$HOME/.config/starship.toml"
+  "$HOME/.claude/statusline.sh"
 )
 
 for path in "${EXPECTED[@]}"; do
