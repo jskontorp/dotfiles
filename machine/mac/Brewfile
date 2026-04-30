@@ -26,3 +26,6 @@ brew "neovim"
 brew "node"
 brew "pnpm"
 brew "just"
+
+# GUI apps
+cask "ghostty"
