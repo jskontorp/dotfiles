@@ -340,6 +340,20 @@ check:
       exit 1
     fi
     ( cd {{DOTFILES}}/pi/agent/extensions && tsc --noEmit ) && printf "  ✅ no type errors\n"
+    printf "\nBrewfile (mac):\n"
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+      if ! command -v brew >/dev/null 2>&1; then
+        printf "  ⚠ brew not on PATH — skipped\n" >&2
+      else
+        # --no-upgrade: presence-only check (don't trip on every upstream release).
+        # HOMEBREW_NO_AUTO_UPDATE: don't trigger network auto-update during a fast check.
+        HOMEBREW_NO_AUTO_UPDATE=1 brew bundle check --no-upgrade --file={{DOTFILES}}/machine/mac/Brewfile >/dev/null \
+          && printf "  ✅ Brewfile satisfied\n" \
+          || { printf "  ❌ Brewfile drift — run 'brew bundle install --file={{DOTFILES}}/machine/mac/Brewfile'\n" >&2; exit 1; }
+      fi
+    else
+      printf "  — skipped on non-Darwin\n"
+    fi
 
 # Run dotfiles install validation in Docker (full integration). For fast
 # skill unit tests, use `just test-skills` / `just test-skill <name>`.
