@@ -101,6 +101,10 @@
       }
     ]
   },
+  "statusLine": {
+    "type": "command",
+    "command": "~/.claude/statusline.sh"
+  },
   "theme": "auto",
   "skipAutoPermissionPrompt": true
 }
