@@ -81,7 +81,7 @@ Run `just link` after mutating changes. Skill management commands (all work rega
 - `just skills` — unified inventory table.
 - `just new-skill <name>` — scaffold a custom global skill (authored locally, tracked in dotfiles).
 - `just edit-skill <name>` — open an existing skill in `$EDITOR`.
-- `just add-skill <url> <name> [subpath] [scope] [rev] [dry-run]` — add a marketplace skill; scope defaults to `global`, use `project:<name>` for per-repo; pass `rev` to pin an explicit SHA; pass `dry-run` as the 6th arg to preview.
-- `just update-skill <name>` — bump a marketplace skill's pinned SHA to upstream HEAD.
+- `just add-skill <url> <name> [subpath] [scope] [rev] [dry-run]` — add a marketplace skill; scope defaults to `global`, use `project:<name>` for per-repo; pass `rev` to record a specific commit; pass `dry-run` as the 6th arg to preview.
+- `just update-skill <name>` — refresh a marketplace skill from upstream HEAD.
 
 > **Revisit this layout** when `just skills` shows ≥25 entries, or by 2026-06-01, whichever comes first. If LLM authoring has produced misplaced skills or the `scope` field feels under-expressive, consider unifying skills + marketplace under a single manifest (see dotfiles history for prior design sketches).

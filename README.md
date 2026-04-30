@@ -34,6 +34,7 @@ just update    # upgrade packages + install new additions (hits network)
 | `just update` | Upgrade packages + install new additions |
 | `just link` | Re-symlink all configs |
 | `just status` | Show installed tool versions |
+| `just check` | Fast host-side checks (justfile parity, manifest integrity, bash portability); wired into pre-commit |
 | `just test` | Run Docker validation |
 
 **Edit configs:**

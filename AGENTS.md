@@ -8,11 +8,11 @@ Repo-local addendum for agents working on this dotfiles repo. The global cross-a
 |---|---|---|---|
 | `install.sh`, `.install-manifest` | `just check` | `just test` | New `_link`/`_linkd` call → also add the destination path to `EXPECTED[]` in `test/validate-manifest.sh`. Scope changes → re-read `install.sh`'s scope-handling block. |
 | `justfile` | `just check` | `just test` (if recipe affects linking) | Cross-platform parity (`SHARED_STATUS_TOOLS`, `GLOBAL_PNPM`) is auto-asserted. |
-| `pi/agent/skills/**` (edit, add, remove) | `just link && just skills` | `just test`; plus `just test-skill <name>` if the skill ships `tests/run.sh` | The Claude mirror list is derived from `claude-compatible:` frontmatter — adding a new skill doesn't require touching `verify.sh`. |
-| `pi/skill-lock.json` | `just link && just skills` | `just test` | Add new entries via `just add-skill <url> <name> [subpath] [scope]`. Bump SHAs via `just update-skill <name>`. Hand-edit only for emergencies. |
+| `pi/agent/skills/**` (edit, add, remove) | `just link && just skills` | `just test`; plus `just test-skill <name>` if the skill ships `tests/run.sh` | The Claude mirror list is derived from `claude-compatible:` frontmatter (in `verify.sh`) — adding a new skill doesn't require touching tests. The Fast check confirms registration; the mirror invariant itself is only validated by `just test`. |
+| `pi/skill-lock.json` | `just link && just skills` | `just test` | Add new entries via `just add-skill <url> <name> [subpath] [scope]`. Refresh from upstream via `just update-skill <name>`. Hand-edit only for emergencies. |
 | `claude/CLAUDE.md`, `claude/agents/*.md`, `claude/settings.json` | `just link` | `just test` | When widening `claude/settings.json` permissions, document the rationale inline in the JSON. |
 
-`just check` runs in <1s (justfile parity, manifest integrity, bash portability) and is also wired into `git/hooks/pre-commit`. `just test` runs the full Docker integration suite (~minutes).
+`just check` runs the host-side suite (justfile parity, manifest integrity, bash portability) and is wired into `git/hooks/pre-commit`. `just test` runs the full Docker integration suite (~minutes).
 
 ## Workflow rules
 
@@ -29,4 +29,4 @@ Repo-local addendum for agents working on this dotfiles repo. The global cross-a
 
 ## Known gaps
 
-No type-check for `pi/agent/extensions/*.ts`; `init.sh`, `machine/*/bootstrap.sh`, and `Brewfile` are only shellchecked; `verify.sh`'s `mac` Docker target uses a `uname` shim, so real macOS-only paths aren't exercised. Don't claim a check exists for these surfaces.
+No type-check for `pi/agent/extensions/*.ts`; `init.sh` and `machine/*/bootstrap.sh` are only shellchecked; `Brewfile` is not validated at all; `verify.sh`'s `mac` Docker target uses a `uname` shim, so real macOS-only paths aren't exercised. Don't claim a check exists for these surfaces.
