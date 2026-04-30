@@ -145,17 +145,38 @@ with open(sys.argv[1]) as f:
     data = json.load(f)
 for name, info in data.get('skills', {}).items():
     skill_dir = os.path.dirname(info['skillPath'])
-    print(f'{name}\\t{info[\"sourceUrl\"]}\\t{skill_dir}')
-" "$SKILL_LOCK" | while IFS=$'\t' read -r name url skill_dir; do
+    sha = info.get('skillFolderHash', '')
+    print(f'{name}\\t{info[\"sourceUrl\"]}\\t{skill_dir}\\t{sha}')
+" "$SKILL_LOCK" | while IFS=$'\t' read -r name url skill_dir sha; do
     [[ -d "$SKILL_CACHE/$name" ]] && continue
     echo "Installing pi skill: $name"
     tmp=$(mktemp -d)
-    if git clone --depth 1 --filter=blob:none --sparse "$url" "$tmp/repo" 2>/dev/null &&
-       (cd "$tmp/repo" && git sparse-checkout set "$skill_dir" 2>/dev/null); then
-      cp -r "$tmp/repo/$skill_dir" "$SKILL_CACHE/$name"
-    else
-      echo "  ⚠ Failed to install $name" >&2
+    # Pin to recorded SHA when present. Falls back to HEAD with a warning if
+    # the SHA is unreachable (force-pushed away, repo gone private, etc.) so
+    # an installation never silently shifts versions across machines.
+    fetched=""
+    if [[ -n "$sha" ]]; then
+      if (cd "$tmp" && git init -q repo && cd repo \
+          && git remote add origin "$url" \
+          && git fetch --depth 1 --filter=blob:none origin "$sha" 2>/dev/null \
+          && git sparse-checkout init --cone 2>/dev/null \
+          && git sparse-checkout set "$skill_dir" 2>/dev/null \
+          && git checkout -q FETCH_HEAD 2>/dev/null); then
+        fetched="$sha"
+      else
+        echo "  ⚠ $name: pinned SHA $sha unreachable, falling back to HEAD" >&2
+        rm -rf "$tmp/repo"
+      fi
     fi
+    if [[ -z "$fetched" ]]; then
+      if ! (git clone --depth 1 --filter=blob:none --sparse "$url" "$tmp/repo" 2>/dev/null \
+            && cd "$tmp/repo" && git sparse-checkout set "$skill_dir" 2>/dev/null); then
+        echo "  ❌ Failed to install $name" >&2
+        rm -rf "$tmp"
+        continue
+      fi
+    fi
+    cp -r "$tmp/repo/$skill_dir" "$SKILL_CACHE/$name"
     rm -rf "$tmp"
   done
 
