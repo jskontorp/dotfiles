@@ -73,7 +73,7 @@ This file lives at `~/code/personal/dotfiles/pi/agent/AGENTS.md` (pi reads it vi
 
 - Custom global skill you authored → `dotfiles/pi/agent/skills/<name>/`
 - Marketplace skill from a GitHub repo → `just add-skill <url> <name> [subpath] [scope]`, or hand-edit `dotfiles/pi/skill-lock.json`. Entries support optional `scope: "project:<name>"` to symlink into that project's repo only.
-- Skill needed in only one project → `dotfiles/projects/<repo>/skills/<name>/` (repo mapped via `projects.conf`)
+- Skill needed in only one project → `dotfiles/projects/<repo>/skills/<name>/` (project's on-disk path declared in `dotfiles/projects/<repo>/.path`)
 - Global extension → `dotfiles/pi/agent/extensions/<name>.ts`
 - Inventory overview: `just skills`.
 

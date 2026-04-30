@@ -58,7 +58,7 @@ just update    # upgrade packages + install new additions (hits network)
 | `just add-skill <url> <name> [subpath] [scope] [rev] [dry-run]` | Install a marketplace skill from GitHub; optional `project:<name>` scope |
 | `just update-skill <name>` | Bump a marketplace skill's pinned SHA to upstream HEAD |
 
-See `pi/agent/AGENTS.md` for the authoritative routing rules (what goes where). Project-scoped skills are resolved via `projects.conf`.
+See `pi/agent/AGENTS.md` for the authoritative routing rules (what goes where). Project-scoped skills are resolved via `projects/<name>/.path` files (each project's on-disk location).
 
 ## Structure
 

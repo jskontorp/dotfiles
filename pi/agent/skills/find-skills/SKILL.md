@@ -54,7 +54,7 @@ just add-skill <url> <name> [subpath] [scope] [rev] [dry-run]
 - `<url>` = `https://github.com/<owner>/<repo>`
 - `<name>` = the slug (also the local identifier)
 - `<subpath>` = path to the skill dir inside the upstream repo. **Default is `skills/<name>`, but verify** — some repos nest deeper (e.g. `plugins/javascript-typescript/skills/typescript-advanced-types`). Open the upstream repo or `WebFetch` its tree to confirm before running. A wrong subpath will fail the clone step in `install.sh`.
-- `<scope>` = `global` (default) or `project:<name>` for a per-repo skill. `project:*` requires the project to be listed in `dotfiles/projects.conf`.
+- `<scope>` = `global` (default) or `project:<name>` for a per-repo skill. `project:*` requires `dotfiles/projects/<name>/.path` to declare the repo's on-disk path.
 - `<rev>` = optional commit SHA to pin. Omit to track upstream HEAD.
 - Pass `dry-run` as the 6th arg to preview the lock-file diff without writing.
 

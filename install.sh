@@ -182,7 +182,7 @@ for name, info in data.get('skills', {}).items():
 
   # Symlink marketplace skills. `scope` field (optional per entry) is either
   # "global" (default → ~/.pi/agent/skills/<name> + ~/.claude/skills/<name>) or
-  # "project:<name>" → resolves via projects.conf and symlinks into
+  # "project:<name>" → resolves via projects/<name>/.path and symlinks into
   # <repo>/.pi/skills/<name> + <repo>/.claude/skills/<name>. Claude mirror is
   # skipped for skills with `claude-compatible: false` in their SKILL.md.
   # If scope changes between runs, stale symlinks at other locations (that we
@@ -214,18 +214,17 @@ for name, info in data.get('skills', {}).items():
       elif [[ "$scope" == project:* ]]; then
         proj="${scope#project:}"
         repo=""
-        if [[ -f "$DOTFILES/projects.conf" ]]; then
-          while IFS= read -r line; do
-            [[ "$line" =~ ^[[:space:]]*# ]] && continue
-            [[ -z "${line// /}" ]] && continue
-            read -r p_name p_path <<< "$line"
-            [[ "$p_name" != "$proj" ]] && continue
+        path_file="$DOTFILES/projects/$proj/.path"
+        if [[ -f "$path_file" ]]; then
+          while IFS= read -r p_path; do
+            [[ "$p_path" =~ ^[[:space:]]*# ]] && continue
+            [[ -z "${p_path// /}" ]] && continue
             p_path="${p_path/#\~/$HOME}"
             if [[ -d "$p_path/.git" ]]; then
               repo="$p_path"
               break
             fi
-          done < "$DOTFILES/projects.conf"
+          done < "$path_file"
         fi
         if [[ -n "$repo" ]]; then
           mkdir -p "$repo/.pi/skills"
@@ -235,7 +234,7 @@ for name, info in data.get('skills', {}).items():
             desired_claude="$repo/.claude/skills/$name"
           fi
         else
-          echo "  ⚠ Scope project:$proj for $name: project not found in projects.conf or not checked out, skipping" >&2
+          echo "  ⚠ Scope project:$proj for $name: project not registered (projects/$proj/.path missing) or not checked out, skipping" >&2
         fi
       else
         echo "  ⚠ Skill $name has unknown scope '$scope', skipping" >&2
@@ -254,11 +253,11 @@ for name, info in data.get('skills', {}).items():
         rm "$stale"
       fi
     done
-    if [[ -f "$DOTFILES/projects.conf" ]]; then
-      while IFS= read -r line; do
-        [[ "$line" =~ ^[[:space:]]*# ]] && continue
-        [[ -z "${line// /}" ]] && continue
-        read -r _ p_path <<< "$line"
+    for path_file in "$DOTFILES/projects"/*/.path; do
+      [[ ! -f "$path_file" ]] && continue
+      while IFS= read -r p_path; do
+        [[ "$p_path" =~ ^[[:space:]]*# ]] && continue
+        [[ -z "${p_path// /}" ]] && continue
         p_path="${p_path/#\~/$HOME}"
         for sub in ".pi/skills" ".claude/skills"; do
           stale="$p_path/$sub/$name"
@@ -270,8 +269,8 @@ for name, info in data.get('skills', {}).items():
             rm "$stale"
           fi
         done
-      done < "$DOTFILES/projects.conf"
-    fi
+      done < "$path_file"
+    done
 
     # Create the symlinks at the desired locations.
     [[ -n "$desired" ]]        && _linkd "$content" "$desired"
@@ -296,17 +295,17 @@ print('\n'.join(data.get('skills', {}).keys()))
       for link in "$HOME/.pi/agent/skills/$name" "$HOME/.claude/skills/$name"; do
         [[ -L "$link" && ! -e "$link" ]] && rm "$link"
       done
-      if [[ -f "$DOTFILES/projects.conf" ]]; then
-        while IFS= read -r line; do
-          [[ "$line" =~ ^[[:space:]]*# ]] && continue
-          [[ -z "${line// /}" ]] && continue
-          read -r _ p_path <<< "$line"
+      for path_file in "$DOTFILES/projects"/*/.path; do
+        [[ ! -f "$path_file" ]] && continue
+        while IFS= read -r p_path; do
+          [[ "$p_path" =~ ^[[:space:]]*# ]] && continue
+          [[ -z "${p_path// /}" ]] && continue
           p_path="${p_path/#\~/$HOME}"
           for link in "$p_path/.pi/skills/$name" "$p_path/.claude/skills/$name"; do
             [[ -L "$link" && ! -e "$link" ]] && rm "$link"
           done
-        done < "$DOTFILES/projects.conf"
-      fi
+        done < "$path_file"
+      done
     fi
   done
 fi
@@ -370,71 +369,73 @@ if [[ "$MACHINE" == "vm" ]]; then
 fi
 
 # --- Project-specific pi config ---
-# Reads projects.conf for candidate paths, symlinks skills/ and extensions/
-# into each project's .pi/ directory. AGENTS.md is NOT managed here — it
-# lives in the project repo and follows normal git.
-if [[ -f "$DOTFILES/projects.conf" ]]; then
-  _project_found=""
+# Walks projects/<name>/ directories. Each project advertises its on-disk
+# location via projects/<name>/.path (single line, may use ~). install.sh
+# symlinks the project's skills/, hookify/, and other subdirs into the
+# checked-out repo's .pi/ and .claude/ dirs. AGENTS.md is NOT managed here
+# — it lives in the project repo and follows normal git.
+for pdir in "$DOTFILES/projects"/*/; do
+  [[ ! -d "$pdir" ]] && continue
+  name="$(basename "$pdir")"
+  path_file="$pdir.path"
+  if [[ ! -f "$path_file" ]]; then
+    echo "$name has no .path file, skipping project config" >&2
+    continue
+  fi
+  candidate=""
   while IFS= read -r line; do
-    # Skip comments and blank lines
     [[ "$line" =~ ^[[:space:]]*# ]] && continue
     [[ -z "${line// /}" ]] && continue
-
-    read -r name candidate <<< "$line"
-    candidate="${candidate/#\~/$HOME}"
-
-    # Skip if we already found this project
-    [[ " $_project_found " == *" $name "* ]] && continue
-
-    if [[ -d "$candidate/.git" ]]; then
-      _project_found+=" $name"
-      echo "Found $name at $candidate"
-      local_pi="$candidate/.pi"
-      mkdir -p "$local_pi"
-
-      # Symlink each subdirectory present in projects/<name>/
-      for sub in "$DOTFILES/projects/$name"/*/; do
-        [[ ! -d "$sub" ]] && continue
-        sub_name="$(basename "$sub")"
-        if [[ "$sub_name" == "skills" ]]; then
-          # Individual skill symlinks (same pattern as global skills).
-          # Exclusion is frontmatter-driven (claude-compatible: false), so a
-          # project skill can opt out for Claude explicitly without any
-          # central list — no risk of silent name-shadowing.
-          [[ -L "$local_pi/skills" ]] && rm "$local_pi/skills"
-          mkdir -p "$local_pi/skills"
-          local_claude_skills="$candidate/.claude/skills"
-          mkdir -p "$local_claude_skills"
-          find "$local_claude_skills" -maxdepth 1 -type l ! -exec test -e {} \; -delete 2>/dev/null
-          for skill in "$sub"*/; do
-            [[ ! -d "$skill" ]] && continue
-            skill_name="$(basename "$skill")"
-            _linkd "$skill" "$local_pi/skills/$skill_name"
-            _claude_skill_excluded "$skill" && continue
-            _linkd "$skill" "$local_claude_skills/$skill_name"
-          done
-        elif [[ "$sub_name" == "hookify" ]]; then
-          # Claude hookify rules: symlink each hookify.*.local.md into
-          # <repo>/.claude/ (hookify discovers rules there by naming convention).
-          mkdir -p "$candidate/.claude"
-          for rule in "$sub"hookify.*.local.md; do
-            [[ ! -f "$rule" ]] && continue
-            _link "$rule" "$candidate/.claude/$(basename "$rule")"
-          done
-        else
-          _linkd "$sub" "$local_pi/$sub_name"
-        fi
-      done
+    line="${line/#\~/$HOME}"
+    if [[ -d "$line/.git" ]]; then
+      candidate="$line"
+      break
     fi
-  done < "$DOTFILES/projects.conf"
+  done < "$path_file"
 
-  # Report projects not found
-  for dir in "$DOTFILES/projects"/*/; do
-    [[ ! -d "$dir" ]] && continue
-    pname="$(basename "$dir")"
-    [[ " $_project_found " != *" $pname "* ]] && echo "$pname not found, skipping project config"
+  if [[ -z "$candidate" ]]; then
+    echo "$name not found, skipping project config"
+    continue
+  fi
+
+  echo "Found $name at $candidate"
+  local_pi="$candidate/.pi"
+  mkdir -p "$local_pi"
+
+  # Symlink each subdirectory present in projects/<name>/
+  for sub in "$pdir"*/; do
+    [[ ! -d "$sub" ]] && continue
+    sub_name="$(basename "$sub")"
+    if [[ "$sub_name" == "skills" ]]; then
+      # Individual skill symlinks (same pattern as global skills).
+      # Exclusion is frontmatter-driven (claude-compatible: false), so a
+      # project skill can opt out for Claude explicitly without any
+      # central list — no risk of silent name-shadowing.
+      [[ -L "$local_pi/skills" ]] && rm "$local_pi/skills"
+      mkdir -p "$local_pi/skills"
+      local_claude_skills="$candidate/.claude/skills"
+      mkdir -p "$local_claude_skills"
+      find "$local_claude_skills" -maxdepth 1 -type l ! -exec test -e {} \; -delete 2>/dev/null
+      for skill in "$sub"*/; do
+        [[ ! -d "$skill" ]] && continue
+        skill_name="$(basename "$skill")"
+        _linkd "$skill" "$local_pi/skills/$skill_name"
+        _claude_skill_excluded "$skill" && continue
+        _linkd "$skill" "$local_claude_skills/$skill_name"
+      done
+    elif [[ "$sub_name" == "hookify" ]]; then
+      # Claude hookify rules: symlink each hookify.*.local.md into
+      # <repo>/.claude/ (hookify discovers rules there by naming convention).
+      mkdir -p "$candidate/.claude"
+      for rule in "$sub"hookify.*.local.md; do
+        [[ ! -f "$rule" ]] && continue
+        _link "$rule" "$candidate/.claude/$(basename "$rule")"
+      done
+    else
+      _linkd "$sub" "$local_pi/$sub_name"
+    fi
   done
-fi
+done
 
 # --- Git hooks (for the dotfiles repo itself) ---
 if [[ -d "$DOTFILES/.git" ]]; then
