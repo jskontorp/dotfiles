@@ -22,12 +22,18 @@ brew bundle --file="$SCRIPT_DIR/Brewfile"
 # --- Symlink dotfiles (before TPM so ~/.tmux.conf exists) ---
 source "$DOTFILES/install.sh"
 
-# --- TPM + tmux plugins ---
+# --- TPM (must exist before `just update` runs tmux plugin install) ---
 echo "📦 Installing tmux plugin manager..."
 [[ -d "$HOME/.tmux/plugins/tpm" ]] || \
   git clone --depth=1 https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
-echo "📦 Installing tmux plugins via TPM..."
-"$HOME/.tmux/plugins/tpm/bin/install_plugins"
+
+# --- Install remaining tools via `just update` (single source of truth) ---
+# Installs the global pnpm packages — pi, claude-code, pyright, typescript —
+# materialises Claude Code's native binary, and installs tmux plugins. Brewfile
+# already ran above so `just`/`pnpm`/`node`/`bat` are present; the redundant
+# brew bundle inside `just update` is a fast no-op on a freshly bootstrapped
+# host.
+just -f "$DOTFILES/justfile" update
 
 # --- Git identity (stored in ~/.gitconfig.local, not in the repo) ---
 if [[ ! -f "$HOME/.gitconfig.local" ]]; then
