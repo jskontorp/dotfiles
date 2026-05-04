@@ -4,6 +4,8 @@ Unified dev environment for macOS and Linux.
 
 ## Fresh machine
 
+(Command Line Tools for Xcode required)
+
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/jskontorp/dotfiles/main/init.sh)
 ```
