@@ -8,9 +8,16 @@ DOTFILES="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 echo "🚀 Bootstrapping macOS dev environment..."
 
+# --- Xcode CLT sanity check (Homebrew silently relies on it) ---
+if ! xcode-select -p &>/dev/null; then
+  echo "❌ Xcode Command Line Tools missing. Run init.sh first, or:"
+  echo "     xcode-select --install"
+  exit 1
+fi
+
 # --- Homebrew ---
 if ! command -v brew &>/dev/null; then
-  echo "📦 Installing Homebrew..."
+  echo "📦 Installing Homebrew (this can take 5–15 min on a fresh box; don't ctrl-C if it looks idle)..."
   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
   eval "$(/opt/homebrew/bin/brew shellenv)"
 fi
