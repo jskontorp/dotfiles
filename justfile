@@ -33,6 +33,14 @@ update:
     echo "📦 Homebrew..."
     brew update && brew bundle --file="{{MAC}}/Brewfile" && brew upgrade && brew cleanup
     echo "📦 global pnpm packages..."
+    # Ensure pnpm's global bin exists + is on PATH for this shell. PNPM_HOME
+    # itself is exported from zsh/core.zsh; we re-export here because `just`
+    # recipes don't inherit interactive-shell config. Creating the dir is
+    # what `pnpm setup` would do — we skip `pnpm setup` to avoid it appending
+    # a duplicate PNPM_HOME block to ~/.zshrc.
+    export PNPM_HOME="$HOME/Library/pnpm"
+    export PATH="$PNPM_HOME:$PATH"
+    mkdir -p "$PNPM_HOME"
     pnpm add -g {{GLOBAL_PNPM}}
 
     # Ensure Claude Code's native binary is present (see VM recipe for rationale).

@@ -11,6 +11,7 @@ Repo-local addendum for agents working on this dotfiles repo. The global cross-a
 | `pi/agent/skills/**` (edit, add, remove) | `just link && just skills` | `just test`; plus `just test-skill <name>` if the skill ships `tests/run.sh` | The Claude mirror list is derived from `claude-compatible:` frontmatter (in `verify.sh`) — adding a new skill doesn't require touching tests. The Fast check confirms registration; the mirror invariant itself is only validated by `just test`. |
 | `pi/skill-lock.json` | `just link && just skills` | `just test` | Add new entries via `just add-skill <url> <name> [subpath] [scope]`. Refresh from upstream via `just update-skill <name>`. Hand-edit only for emergencies. |
 | `claude/CLAUDE.md`, `claude/agents/*.md`, `claude/settings.json` | `just link` | `just test` | When widening `claude/settings.json` permissions, document the rationale inline in the JSON. |
+| `zsh/*.zsh` | `just check` (bash-portability scan) | `just test` | Sourced by every interactive shell on bootstrap; the Docker suite's "zshrc sources cleanly" / re-source-safety checks are the only end-to-end coverage. PATH / env-export logic isn't asserted explicitly — eyeball it. |
 
 `just check` runs the host-side suite (justfile parity, manifest integrity, bash portability) and is wired into `git/hooks/pre-commit`. `just test` runs the full Docker integration suite (~minutes).
 
