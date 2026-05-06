@@ -30,3 +30,11 @@ brew "shellcheck"       # pre-commit lint for *.sh
 
 # GUI apps
 cask "ghostty"
+
+# Optional: full integration test suite (`just test`).
+# Uncomment one to enable Docker-based verification of install.sh in clean
+# containers. OrbStack is lighter on macOS; Docker Desktop is the canonical
+# option. Most users don't need this — `just check` covers the host-side
+# suite and is what the pre-commit hook runs.
+# cask "orbstack"
+# cask "docker"

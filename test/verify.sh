@@ -9,6 +9,25 @@ set -euo pipefail
 DOTFILES="$(cd "$(dirname "$0")/.." && pwd)"
 TARGET="${1:-both}"
 
+if ! command -v docker &>/dev/null; then
+  cat >&2 <<'EOF'
+❌ docker not found on PATH.
+
+`just test` runs install.sh inside clean Linux/macOS-shim containers and
+requires a Docker runtime. Most edits don't need it — `just check` covers
+the host-side suite (justfile parity, manifest integrity, bash portability)
+and is what the pre-commit hook runs.
+
+To enable the full suite, install one of:
+  brew install orbstack          # lighter on macOS
+  brew install --cask docker     # Docker Desktop
+
+Then start the runtime and re-run `just test`. (See machine/mac/Brewfile
+for the opt-in cask lines.)
+EOF
+  exit 1
+fi
+
 # PID suffix isolates parallel invocations of this script (e.g. `just test`
 # in one pane while `just test vm` runs in another) so they don't share a
 # container name and stomp each other's `docker rm -f`.
