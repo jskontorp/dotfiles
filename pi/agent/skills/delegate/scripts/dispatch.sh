@@ -62,8 +62,14 @@ echo "---" >> "$RESULT_FILE"
 echo "" >> "$RESULT_FILE"
 
 cd "$TASK_DIR"
-"${TIMEOUT_CMD[@]}" "${PI_CMD[@]}" >> "$RESULT_FILE" 2>&1
-EXIT_CODE=$?
+# Tee output so a `tmux attach -t pi-delegate` pane shows live progress
+# while still capturing everything to the result file. Use PIPESTATUS so
+# pipefail doesn't mask the sub-agent's exit code with tee's, and `|| true`
+# so a non-zero sub-agent exit doesn't trigger `set -e` before we record it.
+# (Sequential fallback callers should redirect dispatch.sh's stdout to avoid
+# interleaving multiple sub-agents into the orchestrator's terminal.)
+"${TIMEOUT_CMD[@]}" "${PI_CMD[@]}" 2>&1 | tee -a "$RESULT_FILE" || true
+EXIT_CODE=${PIPESTATUS[0]}
 
 # Record exit code
 echo "$EXIT_CODE" > "$EXIT_FILE"

@@ -148,7 +148,10 @@ Tell the user: **`Watch live: tmux attach -t pi-delegate`**
 
 ```bash
 for each task in batch:
-  "$SKILL_DIR/scripts/dispatch.sh" "$TASK_ID" "$TASK_DIR" "$TASK_TIMEOUT" "$PROMPT_FILE" "$RESULTS_DIR" "$TASK_MODEL" "$TASK_TOOLS" &
+  # Redirect stdout/stderr so backgrounded dispatch.sh processes don't
+  # interleave their tee output into the orchestrator's terminal — the
+  # full transcript is already captured in $RESULTS_DIR/${TASK_ID}.md.
+  "$SKILL_DIR/scripts/dispatch.sh" "$TASK_ID" "$TASK_DIR" "$TASK_TIMEOUT" "$PROMPT_FILE" "$RESULTS_DIR" "$TASK_MODEL" "$TASK_TOOLS" >/dev/null 2>&1 &
 done
 wait
 ```
