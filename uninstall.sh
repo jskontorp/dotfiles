@@ -81,7 +81,9 @@ if (( skipped_not_symlink > 0 )); then
 fi
 
 # --- Footer: things uninstall does NOT touch ---
-cat <<EOF
+# Quoted heredoc — the `just …` line below uses backticks which would
+# otherwise be interpreted as command substitution.
+cat <<'EOF'
 
 Not touched (clean up manually if you also want these gone, or run
   `just uninstall-full --yes` on Mac for the nuclear option):

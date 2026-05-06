@@ -285,6 +285,67 @@ run_test() {
   check "third uninstall is a no-op (no manifest)" \
     'dexec bash -c "cd ~/dotfiles && ./uninstall.sh | grep -q \"nothing to do\""'
 
+  # --- Full uninstall cycle (Mac-only) ---
+  # uninstall-full.sh codifies the manual nuclear teardown documented in
+  # uninstall.sh's footer. In this container brew is stubbed and pnpm is
+  # absent, so steps 2-3 are no-ops by design; we exercise the
+  # confirmation gate, the platform gate, the manifest-symlink removal
+  # (step 1), and the runtime-dir purge (step 4) by seeding paths the
+  # script claims to wipe and asserting they are gone afterwards.
+  if [[ "$machine" == "mac" ]]; then
+    printf "\nFull uninstall cycle (Mac):\n"
+    # Re-install so step 1 (manifest symlinks) has something to remove.
+    dexec bash -c "cd ~/dotfiles && ./install.sh" >/dev/null
+
+    # Confirmation gate: refuses without --yes / UNINSTALL_FULL_CONFIRM.
+    check "uninstall-full refuses without --yes" \
+      'dexec bash -c "cd ~/dotfiles && ./uninstall-full.sh; [ \$? -eq 2 ]"'
+    check "manifest still present after refused run" \
+      'dexec bash -c "test -f ~/dotfiles/.install-manifest"'
+
+    # Seed a representative subset of PURGE_PATHS so step 4 has work to do.
+    # Cover: a deep dir (tmux plugins), a single tracked file (CLAUDE.md
+    # is a real file install.sh writes outside the manifest), pi state
+    # (auth.json + sessions dir), and an OrbStack runtime dir.
+    dexec bash -c "mkdir -p ~/.tmux/plugins/tpm ~/.pi/agent/sessions ~/.orbstack/data ~/.local/share/pi-skills"
+    dexec bash -c "echo data > ~/.tmux/plugins/tpm/marker"
+    dexec bash -c "echo cred > ~/.pi/agent/auth.json"
+    dexec bash -c "echo sess > ~/.pi/agent/sessions/run.jsonl"
+    dexec bash -c "echo orb  > ~/.orbstack/data/marker"
+    # Seed the survivors too so we can assert they pass through untouched.
+    dexec bash -c "echo 'history-line' > ~/.zsh_history"
+
+    # Run nuclear teardown.
+    dexec bash -c "cd ~/dotfiles && ./uninstall-full.sh --yes" >/dev/null
+
+    check "uninstall-full removes manifest" \
+      'dexec bash -c "! test -e ~/dotfiles/.install-manifest"'
+    check "uninstall-full removes ~/.tmux/plugins" \
+      'dexec bash -c "! test -e ~/.tmux/plugins"'
+    check "uninstall-full removes ~/.pi/agent/auth.json" \
+      'dexec bash -c "! test -e ~/.pi/agent/auth.json"'
+    check "uninstall-full removes ~/.pi/agent/sessions" \
+      'dexec bash -c "! test -e ~/.pi/agent/sessions"'
+    check "uninstall-full removes ~/.pi/agent/settings.json" \
+      'dexec bash -c "! test -e ~/.pi/agent/settings.json"'
+    check "uninstall-full removes ~/.orbstack" \
+      'dexec bash -c "! test -e ~/.orbstack"'
+    check "uninstall-full removes ~/.local/share/pi-skills" \
+      'dexec bash -c "! test -e ~/.local/share/pi-skills"'
+    check "uninstall-full removes ~/.claude/CLAUDE.md" \
+      'dexec bash -c "! test -e ~/.claude/CLAUDE.md"'
+    check "uninstall-full preserves ~/.gitconfig.local" \
+      'dexec bash -c "grep -q test@example.com ~/.gitconfig.local"'
+    check "uninstall-full preserves ~/.zsh_history" \
+      'dexec bash -c "grep -q history-line ~/.zsh_history"'
+    check "uninstall-full preserves dotfiles checkout" \
+      'dexec bash -c "test -d ~/dotfiles && test -f ~/dotfiles/install.sh"'
+
+    # Idempotent: re-run on already-clean state must not error.
+    check "uninstall-full idempotent (second run exits 0)" \
+      'dexec bash -c "cd ~/dotfiles && ./uninstall-full.sh --yes >/dev/null 2>&1"'
+  fi
+
   # Restore install state for any later checks (none today, but keeps the
   # container in a sensible terminal state for ad-hoc inspection).
   dexec bash -c "cd ~/dotfiles && ./install.sh" >/dev/null
