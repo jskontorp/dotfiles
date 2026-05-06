@@ -82,6 +82,23 @@ if [[ $orphans -gt 0 ]]; then
   errors=$((errors + 1))
 fi
 
+# ~/.claude/CLAUDE.md is generated (sed-substituted with $DOTFILES) rather
+# than symlinked, so it falls outside the manifest's symlink check. Validate
+# it explicitly: file present, contains the @-import to this checkout's
+# AGENTS.md. Catches the moved-checkout regression where a stale CLAUDE.md
+# from a previous $DOTFILES path keeps pointing at a vanished location.
+claude_md="$HOME/.claude/CLAUDE.md"
+expected_import="@$REPO_DIR/pi/agent/AGENTS.md"
+if [[ ! -f "$claude_md" ]]; then
+  printf "  ❌ MISSING: ~/.claude/CLAUDE.md (run install.sh)\n"
+  errors=$((errors + 1))
+elif ! grep -qF "$expected_import" "$claude_md"; then
+  printf "  ❌ STALE: ~/.claude/CLAUDE.md does not @-import %s (re-run install.sh)\n" "$expected_import"
+  errors=$((errors + 1))
+else
+  printf "  ✅ ~/.claude/CLAUDE.md imports %s\n" "${expected_import#@}"
+fi
+
 printf "\n  %d symlinks verified" "$count"
 [[ $orphans -eq 0 ]] && printf ", no untracked"
 printf "\n"
