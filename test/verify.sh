@@ -22,8 +22,8 @@ To enable the full suite, install one of:
   brew install orbstack          # lighter on macOS
   brew install --cask docker     # Docker Desktop
 
-Then start the runtime and re-run `just test`. (See machine/mac/Brewfile
-for the opt-in cask lines.)
+Then start the runtime and re-run `just test`. (OrbStack is in
+machine/mac/Brewfile by default — it also provides the `orb` ssh host.)
 EOF
   exit 1
 fi

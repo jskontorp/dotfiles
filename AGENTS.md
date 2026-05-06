@@ -14,7 +14,7 @@ Repo-local addendum for agents working on this dotfiles repo. The global cross-a
 | `claude/CLAUDE.md`, `claude/agents/*.md`, `claude/settings.json` | `just link` | `just test` | When widening `claude/settings.json` permissions, document the rationale inline in the JSON. |
 | `zsh/*.zsh` | `just check` (bash-portability scan) | `just test` | Sourced by every interactive shell on bootstrap; the Docker suite's "zshrc sources cleanly" / re-source-safety checks are the only end-to-end coverage. PATH / env-export logic isn't asserted explicitly — eyeball it. |
 
-`just check` runs the host-side suite (justfile parity, manifest integrity, bash portability) and is wired into `git/hooks/pre-commit`. `just test` runs the full Docker integration suite (~minutes) and requires a Docker runtime on `PATH` — install via `brew install orbstack` (lighter) or `brew install --cask docker`; the Brewfile has both lines commented out for opt-in. `verify.sh` prints the install hint if `docker` is missing.
+`just check` runs the host-side suite (justfile parity, manifest integrity, bash portability) and is wired into `git/hooks/pre-commit`. `just test` runs the full Docker integration suite (~minutes) and requires a Docker runtime on `PATH` — OrbStack is installed by default via `machine/mac/Brewfile` (it also provides the `ssh orb` host); Docker Desktop is the heavier alternative. `verify.sh` prints the install hint if `docker` is missing.
 
 ## Workflow rules
 
