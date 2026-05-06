@@ -42,16 +42,17 @@ case ":$PATH:" in
 esac
 
 # pnpm global bin — platform default per pnpm docs.
-# Set explicitly so fresh shells work without relying on `pnpm setup` having
-# mutated this file. Idempotent: only prepends if not already on PATH.
+# pnpm ≥10 places global bin shims under $PNPM_HOME/bin (older versions
+# used $PNPM_HOME directly). Set explicitly so fresh shells work without
+# relying on `pnpm setup` having mutated this file. Idempotent.
 case "$(uname -s)" in
   Darwin) export PNPM_HOME="$HOME/Library/pnpm" ;;
   Linux)  export PNPM_HOME="$HOME/.local/share/pnpm" ;;
 esac
 if [[ -n "${PNPM_HOME:-}" ]]; then
   case ":$PATH:" in
-    *":$PNPM_HOME:"*) ;;
-    *) export PATH="$PNPM_HOME:$PATH" ;;
+    *":$PNPM_HOME/bin:"*) ;;
+    *) export PATH="$PNPM_HOME/bin:$PATH" ;;
   esac
 fi
 

@@ -23,12 +23,7 @@ source ~/.config/zsh/core.zsh
 # --- Mac-specific behaviour ---
 cdpath=(~/code ~/code/personal ~/code/work)
 
-# --- pnpm ---
-export PNPM_HOME="$HOME/Library/pnpm"
-case ":$PATH:" in
-  *":$PNPM_HOME:"*) ;;
-  *) export PATH="$PNPM_HOME:$PATH" ;;
-esac
+# pnpm PATH is set in zsh/core.zsh (sourced above).
 
 # --- Plugins (Homebrew) ---
 # Guard: these plugins wrap zle widgets and don't handle re-sourcing.

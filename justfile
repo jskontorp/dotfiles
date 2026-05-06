@@ -35,18 +35,22 @@ update:
     echo "📦 global pnpm packages..."
     # Ensure pnpm's global bin exists + is on PATH for this shell. PNPM_HOME
     # itself is exported from zsh/core.zsh; we re-export here because `just`
-    # recipes don't inherit interactive-shell config. Creating the dir is
-    # what `pnpm setup` would do — we skip `pnpm setup` to avoid it appending
-    # a duplicate PNPM_HOME block to ~/.zshrc.
+    # recipes don't inherit interactive-shell config. pnpm ≥10 uses
+    # $PNPM_HOME/bin as its global-bin-dir (older pnpm used $PNPM_HOME).
+    # Creating the dir is what `pnpm setup` would do — we skip `pnpm setup`
+    # to avoid it appending a duplicate PNPM_HOME block to ~/.zshrc.
     export PNPM_HOME="$HOME/Library/pnpm"
-    export PATH="$PNPM_HOME:$PATH"
-    mkdir -p "$PNPM_HOME"
+    export PATH="$PNPM_HOME/bin:$PATH"
+    mkdir -p "$PNPM_HOME/bin"
     pnpm add -g {{GLOBAL_PNPM}}
 
     # Ensure Claude Code's native binary is present (see VM recipe for rationale).
+    # pnpm ≥11 nests global packages under a content-hashed dir, so
+    # `pnpm root -g` no longer points at the package itself — query
+    # `pnpm list -g --parseable` for the resolved path.
     echo "📦 claude native binary..."
-    CLAUDE_PKG="$(pnpm root -g)/@anthropic-ai/claude-code"
-    if [[ -f "$CLAUDE_PKG/install.cjs" ]]; then
+    CLAUDE_PKG="$(pnpm list -g --parseable 2>/dev/null | grep '/@anthropic-ai/claude-code$' | head -1)"
+    if [[ -n "$CLAUDE_PKG" && -f "$CLAUDE_PKG/install.cjs" ]]; then
       node "$CLAUDE_PKG/install.cjs" || echo "  ⚠ claude install.cjs failed — run manually: node $CLAUDE_PKG/install.cjs"
     elif ! claude --version >/dev/null 2>&1; then
       echo "  ⚠ claude binary not runnable and no install.cjs present."
@@ -167,8 +171,13 @@ update:
     fi
 
     _install pnpm
+    # The standalone installer drops the `pnpm` binary at $PNPM_HOME/pnpm,
+    # while pnpm ≥10 places globally-added shims under $PNPM_HOME/bin
+    # (older pnpm used $PNPM_HOME for both). Put both on PATH so the
+    # post-install global-add step resolves on a fresh VM bootstrap.
     export PNPM_HOME="$HOME/.local/share/pnpm"
-    export PATH="$PNPM_HOME:$PATH"
+    export PATH="$PNPM_HOME:$PNPM_HOME/bin:$PATH"
+    mkdir -p "$PNPM_HOME/bin"
     curl -fsSL https://get.pnpm.io/install.sh | SHELL=/bin/bash sh -
     echo "📦 global pnpm packages..."
     pnpm add -g {{GLOBAL_PNPM}}
@@ -180,9 +189,11 @@ update:
     # explicitly is idempotent and fixes both cases. Newer versions ship
     # install.cjs inside the package; if absent (older version), verify
     # runtime works and warn.
+    # pnpm ≥11 nests global packages under a content-hashed dir; query
+    # `pnpm list -g --parseable` instead of joining onto `pnpm root -g`.
     echo "📦 claude native binary..."
-    CLAUDE_PKG="$(pnpm root -g)/@anthropic-ai/claude-code"
-    if [[ -f "$CLAUDE_PKG/install.cjs" ]]; then
+    CLAUDE_PKG="$(pnpm list -g --parseable 2>/dev/null | grep '/@anthropic-ai/claude-code$' | head -1)"
+    if [[ -n "$CLAUDE_PKG" && -f "$CLAUDE_PKG/install.cjs" ]]; then
       node "$CLAUDE_PKG/install.cjs" || echo "  ⚠ claude install.cjs failed — run manually: node $CLAUDE_PKG/install.cjs"
     elif ! claude --version >/dev/null 2>&1; then
       echo "  ⚠ claude binary not runnable and no install.cjs present."
@@ -226,7 +237,8 @@ status:
 [linux]
 status:
     #!/usr/bin/env bash
-    export PATH="$HOME/.local/bin:$HOME/.local/share/fnm:$HOME/.local/share/pnpm:$PATH"
+    # pnpm ≥10 puts global bins under $PNPM_HOME/bin (older: $PNPM_HOME).
+    export PATH="$HOME/.local/bin:$HOME/.local/share/fnm:$HOME/.local/share/pnpm/bin:$PATH"
     command -v fnm &>/dev/null && eval "$(fnm env)"
     printf "%-12s %s\n" "os"       "$(lsb_release -ds)"
     printf "%-12s %s\n" "kernel"   "$(uname -r)"
