@@ -69,6 +69,10 @@ run_test() {
   dexec bash -c "echo '# old sv completion' > ~/old_dotfiles/zsh/sv.zsh"
   dexec bash -c "ln -sf ~/old_dotfiles/zsh/sv.zsh ~/.config/zsh/sv.zsh"
   dexec bash -c "ln -sf /nonexistent/old-helper.zsh ~/.config/zsh/old-helper.zsh"
+  # Pre-existing user-authored file the uninstall block asserts survives.
+  # bootstrap.sh would normally create this from interactive prompts; here
+  # we seed it directly so the assertion has something to check against.
+  dexec bash -c "printf '[user]\n\tname = Test User\n\temail = test@example.com\n' > ~/.gitconfig.local"
 
   printf "Running install.sh...\n"
   dexec bash -c "cd ~/dotfiles && ./install.sh"
@@ -231,6 +235,59 @@ run_test() {
   check "re-source safe (no dupes, no FUNCNEST)" \
     'dexec zsh -i /home/testuser/dotfiles/test/resource-check.zsh'
   check "core not double-sourced"          'dexec zsh -i -c "source ~/.zshrc; c=0; for f in \$chpwd_functions; do [[ \$f == __osc7_cwd ]] && ((c++)); done; (( c == 1 ))"'
+
+  # --- Uninstall cycle ---
+  # Verifies uninstall.sh: state-drift skips, foreign-target skips, manifest
+  # removal, post-uninstall+reinstall byte-equality of the manifest
+  # (strongest claim: install is deterministic enough that round-tripping
+  # through uninstall produces the same set of links in the same order),
+  # and the no-manifest no-op branch.
+  printf "\nUninstall cycle:\n"
+  # Snapshot the post-install manifest before any tampering.
+  dexec bash -c "cp ~/dotfiles/.install-manifest /tmp/manifest.first"
+  # Seed two states uninstall must distinguish: (a) the manifest-tracked
+  # symlink replaced by a regular file (state drift — must be preserved,
+  # could contain user content), and (b) the manifest-tracked symlink
+  # whose target was changed to point outside $DOTFILES (still a symlink
+  # at a manifest path — the manifest is the contract, must be removed
+  # whatever the target). Targeting outside-of-$DOTFILES also covers the
+  # marketplace-skills case where install.sh legitimately points symlinks
+  # at ~/.local/share/pi-skills/ caches.
+  dexec bash -c "rm ~/.config/zsh/git-aliases.zsh && echo 'user content' > ~/.config/zsh/git-aliases.zsh"  # state drift
+  dexec bash -c "ln -sfn /tmp/foreign-target ~/.config/zsh/git-worktrees.zsh"                              # manifest-tracked, foreign target
+  dexec bash -c "cd ~/dotfiles && ./uninstall.sh" >/dev/null
+
+  check "manifest deleted"                 'dexec bash -c "! test -e ~/dotfiles/.install-manifest"'
+  check "a non-seeded manifest entry is gone" \
+    'dexec bash -c "! test -e ~/.zshrc"'
+  check "in-repo pre-commit symlink gone"  'dexec bash -c "! test -L ~/dotfiles/.git/hooks/pre-commit"'
+  check "state-drift file preserved"       'dexec bash -c "[[ \$(cat ~/.config/zsh/git-aliases.zsh) == \"user content\" ]]"'
+  check "manifest-tracked foreign-target symlink removed" \
+    'dexec bash -c "! test -L ~/.config/zsh/git-worktrees.zsh"'
+  check "marketplace-skill symlinks removed (target outside \$DOTFILES)" \
+    'dexec bash -c "! test -L ~/.pi/agent/skills/typescript-advanced-types"'
+  check "gitconfig.local survives uninstall" 'dexec bash -c "grep -q test@example.com ~/.gitconfig.local"'
+  check "pi settings.json survives uninstall"  'dexec bash -c "test -f ~/.pi/agent/settings.json"'
+  check "claude CLAUDE.md survives uninstall"  'dexec bash -c "test -f ~/.claude/CLAUDE.md"'
+
+  # Clean up the state-drift seed so re-install can proceed normally.
+  # (The foreign-target symlink seed was already removed by uninstall.)
+  dexec bash -c "rm -f ~/.config/zsh/git-aliases.zsh"
+  dexec bash -c "cd ~/dotfiles && ./install.sh" >/dev/null
+
+  check "reinstall manifest matches first install (byte-equal)" \
+    'dexec bash -c "diff -q /tmp/manifest.first ~/dotfiles/.install-manifest"'
+
+  # Idempotent uninstall: second run hits the no-manifest branch.
+  dexec bash -c "cd ~/dotfiles && ./uninstall.sh" >/dev/null
+  check "second uninstall removes manifest again" \
+    'dexec bash -c "! test -e ~/dotfiles/.install-manifest"'
+  check "third uninstall is a no-op (no manifest)" \
+    'dexec bash -c "cd ~/dotfiles && ./uninstall.sh | grep -q \"nothing to do\""'
+
+  # Restore install state for any later checks (none today, but keeps the
+  # container in a sensible terminal state for ad-hoc inspection).
+  dexec bash -c "cd ~/dotfiles && ./install.sh" >/dev/null
 
   docker rm -f "$CONTAINER" >/dev/null 2>&1
   printf "\n"

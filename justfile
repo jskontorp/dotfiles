@@ -270,6 +270,13 @@ status:
 link:
     {{DOTFILES}}/install.sh
 
+# Reverse install.sh: remove every symlink recorded in .install-manifest.
+# Idempotent. The manifest is the contract — see uninstall.sh's footer
+# for the things this does NOT touch (pnpm globals, Brewfile, tmux/claude
+# plugins, ~/.gitconfig.local, etc.).
+uninstall:
+    {{DOTFILES}}/uninstall.sh
+
 # Show unified pi skill inventory: name, scope, source, description
 skills:
     #!/usr/bin/env python3
