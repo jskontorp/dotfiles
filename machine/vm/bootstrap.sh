@@ -21,7 +21,8 @@ sudo apt-get install -y -qq \
   zsh git gh curl wget unzip jq fzf \
   ripgrep fd-find bat \
   fail2ban \
-  build-essential
+  build-essential \
+  python3
 
 sudo ln -sf "$(which fdfind)" /usr/local/bin/fd 2>/dev/null || true
 sudo ln -sf "$(which batcat)" /usr/local/bin/bat 2>/dev/null || true
