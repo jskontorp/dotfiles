@@ -24,7 +24,7 @@ Some actions cannot be undone by editing a file. Treat the categories below as *
 - **Production / shared infra**: deploys, secret rotation, restarts of shared services, modifying CI/CD pipelines.
 - **Outbound communication**: posting Slack messages, sending email, opening / closing / commenting on PRs and issues, posting to external services.
 
-Rule: propose the command in chat, wait for explicit approval, then run. If a command is blocked by the harness's permission layer, report the denial and stop — do not look for workarounds (no `bash -c "…"`, no wrapper commands, no writing-then-executing a script). The deny is the policy, not an obstacle. If you genuinely believe a destructive call is necessary, ask first and explain why.
+Rule: propose the command in chat, wait for explicit approval, then run. If a command is blocked by the harness's permission layer, report the denial and stop — do not look for workarounds (no `bash -c "…"`, no wrapper commands, no writing-then-executing a script). The deny is the policy, not an obstacle. Same logic for verification denies — a failing pre-commit hook, `just check`, a test, a lint, a type-check is a policy, not a hint. No `--no-verify`, no `# noqa`, no `--skip-tests`, no commenting out the failing assertion. Report and stop. If you genuinely believe a destructive call is necessary, ask first and explain why.
 
 # Standards
 
