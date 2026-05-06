@@ -6,8 +6,8 @@ description: >-
   Use when the user says "delegate", "split this up", "run these in parallel",
   "fan out", or when a task naturally decomposes into independent workstreams
   (e.g. "review all five modules", "refactor these three services").
-compatibility: Requires pi, tmux (recommended for parallel execution, falls back to sequential)
-allowed-tools: Bash(pi:*) Bash(tmux:*) Bash(cat:*) Bash(mkdir:*) Bash(timeout:*) Bash(gtimeout:*) Bash(kill:*) Read Write Edit
+compatibility: Requires pi, tmux (recommended for parallel execution, falls back to sequential), jq (required for live TUI mode — falls back to headless capture without it)
+allowed-tools: Bash(pi:*) Bash(tmux:*) Bash(cat:*) Bash(mkdir:*) Bash(timeout:*) Bash(gtimeout:*) Bash(kill:*) Bash(sed:*) Bash(sort:*) Bash(tail:*) Read Write Edit
 claude-compatible: false
 ---
 
@@ -18,7 +18,7 @@ Decompose a task into sub-tasks and dispatch each to an independent pi sub-agent
 All `scripts/` paths resolve relative to this skill's directory. Ensure they're executable:
 
 ```bash
-chmod +x scripts/dispatch.sh scripts/poll.sh
+chmod +x scripts/dispatch.sh scripts/poll.sh scripts/watcher.sh
 ```
 
 ## Shell Preamble
@@ -121,11 +121,21 @@ Check for tmux:
 command -v tmux &>/dev/null && echo "tmux available" || echo "tmux unavailable"
 ```
 
-If tmux is available, create a session for the parallel batch:
+If tmux is available, reuse the `pi-delegate` session if one already exists
+(another delegate or `triple-review` batch may be in flight) and pick the
+next free `batch-N` window so we don't clobber a parallel agent's panes.
+Use `sed -E` for BSD/macOS portability — BRE `\+` is not supported there.
 
 ```bash
-tmux kill-session -t pi-delegate 2>/dev/null || true
-tmux new-session -d -s pi-delegate -n batch-1
+if tmux has-session -t pi-delegate 2>/dev/null; then
+  N=$(tmux list-windows -t pi-delegate -F '#{window_name}' 2>/dev/null \
+      | sed -E -n 's/^batch-([0-9]+).*$/\1/p' | sort -n | tail -1)
+  BATCH="batch-$(( ${N:-0} + 1 ))"
+  tmux new-window -t pi-delegate -n "$BATCH"
+else
+  BATCH="batch-1"
+  tmux new-session -d -s pi-delegate -n "$BATCH"
+fi
 ```
 
 For each task in a parallel batch (max 4 per window):
@@ -133,14 +143,33 @@ For each task in a parallel batch (max 4 per window):
 ```bash
 # First task gets the existing pane; subsequent tasks split
 if [ "$PANE_INDEX" -eq 0 ]; then
-  tmux send-keys -t pi-delegate:batch-1 "$SKILL_DIR/scripts/dispatch.sh TASK_ID TASK_DIR TASK_TIMEOUT TASK_PROMPT_FILE RESULTS_DIR TASK_MODEL TASK_TOOLS" Enter
+  tmux send-keys -t "pi-delegate:$BATCH" "$SKILL_DIR/scripts/dispatch.sh TASK_ID TASK_DIR TASK_TIMEOUT TASK_PROMPT_FILE RESULTS_DIR TASK_MODEL TASK_TOOLS" Enter
 else
-  tmux split-window -t pi-delegate:batch-1 "$SKILL_DIR/scripts/dispatch.sh TASK_ID TASK_DIR TASK_TIMEOUT TASK_PROMPT_FILE RESULTS_DIR TASK_MODEL TASK_TOOLS"
-  tmux select-layout -t pi-delegate:batch-1 tiled
+  tmux split-window -t "pi-delegate:$BATCH" "$SKILL_DIR/scripts/dispatch.sh TASK_ID TASK_DIR TASK_TIMEOUT TASK_PROMPT_FILE RESULTS_DIR TASK_MODEL TASK_TOOLS"
+  tmux select-layout -t "pi-delegate:$BATCH" tiled
 fi
 ```
 
-If a batch has >4 tasks, use additional windows (`batch-2`, etc.).
+If a batch has >4 tasks, use additional windows — the same `has-session` +
+`batch-N` increment naturally produces them.
+
+Each pane runs `dispatch.sh`, which (when tmux **and** `jq` are present)
+launches the sub-agent in **pi TUI mode** — full live view of tool calls,
+thinking, and streamed output. A background watcher polls the session JSONL;
+when the assistant's last message reaches a terminal `stopReason`
+(`stop`/`length`/`error`/`aborted`) and no tool calls are pending, it
+extracts the final assistant text into `$RESULTS_DIR/${TASK_ID}.md` and
+sends `/quit` to the pane so pi shuts down cleanly. Sub-agent sessions
+persist under `$DELEGATE_DIR/sessions/${TASK_ID}/` for post-hoc inspection
+(`pi --resume` or `--export`).
+
+**RESULT_FILE shape differs by branch.** Headless (`pi -p | tee`) captures
+everything pi prints; TUI mode captures only the final assistant message's
+text content (tool calls, thinking blocks, intermediate messages live in
+the session JSONL, not in `$RESULTS_DIR/${TASK_ID}.md`). For consumers
+that need the full transcript, read `$DELEGATE_DIR/sessions/${TASK_ID}/`.
+The watcher caps its wait at `TIMEOUT + 30s` so dispatch.sh's `wait` never
+hangs on an externally killed pi.
 
 Tell the user: **`Watch live: tmux attach -t pi-delegate`**
 

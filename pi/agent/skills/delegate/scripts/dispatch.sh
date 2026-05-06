@@ -26,6 +26,8 @@ TASK_TOOLS="${7:-}"
 RESULT_FILE="$RESULTS_DIR/${TASK_ID}.md"
 EXIT_FILE="$RESULTS_DIR/${TASK_ID}.exit"
 START_FILE="$RESULTS_DIR/${TASK_ID}.start"
+SESSION_DIR="$RESULTS_DIR/../sessions/${TASK_ID}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Read prompt from file
 if [ ! -f "$PROMPT_FILE" ]; then
@@ -48,8 +50,24 @@ if [ "$TIMEOUT" -gt 0 ] 2>/dev/null; then
   fi
 fi
 
-# Build pi command
-PI_CMD=(pi -p --no-session --no-skills)
+# Build pi command. In tmux + with jq available, run pi in TUI mode so the
+# pane shows the live agent (tool calls, thinking, streamed output). A
+# background watcher polls the session JSONL for turn completion, extracts
+# the final assistant text into RESULT_FILE, and sends "/quit" to the pane
+# so pi exits cleanly. Outside tmux (sequential fallback), or when jq is
+# missing, fall back to `pi -p` so the existing capture path still works.
+USE_TUI=false
+if [ -n "${TMUX_PANE:-}" ] && command -v jq >/dev/null 2>&1; then
+  USE_TUI=true
+fi
+
+PI_CMD=(pi)
+if $USE_TUI; then
+  mkdir -p "$SESSION_DIR"
+  PI_CMD+=(--session-dir "$SESSION_DIR" --no-skills)
+else
+  PI_CMD+=(-p --no-session --no-skills)
+fi
 [ -n "$TASK_MODEL" ] && PI_CMD+=(--model "$TASK_MODEL")
 [ -n "$TASK_TOOLS" ] && PI_CMD+=(--tools "$TASK_TOOLS")
 PI_CMD+=("$TASK_PROMPT")
@@ -62,14 +80,38 @@ echo "---" >> "$RESULT_FILE"
 echo "" >> "$RESULT_FILE"
 
 cd "$TASK_DIR"
-# Tee output so a `tmux attach -t pi-delegate` pane shows live progress
-# while still capturing everything to the result file. Use PIPESTATUS so
-# pipefail doesn't mask the sub-agent's exit code with tee's, and `|| true`
-# so a non-zero sub-agent exit doesn't trigger `set -e` before we record it.
-# (Sequential fallback callers should redirect dispatch.sh's stdout to avoid
-# interleaving multiple sub-agents into the orchestrator's terminal.)
-"${TIMEOUT_CMD[@]}" "${PI_CMD[@]}" 2>&1 | tee -a "$RESULT_FILE" || true
-EXIT_CODE=${PIPESTATUS[0]}
+
+if $USE_TUI; then
+  # Label the pane so `tmux attach -t pi-delegate` is self-explanatory.
+  PANE_TITLE="$TASK_ID"
+  [ -n "$TASK_MODEL" ] && PANE_TITLE="$PANE_TITLE · $TASK_MODEL"
+  tmux select-pane -t "$TMUX_PANE" -T "$PANE_TITLE" 2>/dev/null || true
+
+  # Background watcher: detects turn completion in the session JSONL,
+  # extracts the final assistant text into RESULT_FILE, and sends /quit
+  # to this pane so pi exits and returns control to dispatch.sh. Pass
+  # MAX_WAIT = TIMEOUT + 30 so the watcher can't outlive an externally
+  # killed pi (would otherwise leave dispatch.sh blocked on `wait`).
+  WATCHER_MAX_WAIT=$(( TIMEOUT > 0 ? TIMEOUT + 30 : 1800 ))
+  "$SCRIPT_DIR/watcher.sh" "$SESSION_DIR" "$RESULT_FILE" "$TMUX_PANE" 2 30 "$WATCHER_MAX_WAIT" &
+  WATCHER_PID=$!
+
+  # Run pi in TUI mode in the foreground (fills the pane).
+  EXIT_CODE=0
+  "${TIMEOUT_CMD[@]}" "${PI_CMD[@]}" || EXIT_CODE=$?
+
+  # Reap watcher (it should already have exited after sending /quit).
+  wait "$WATCHER_PID" 2>/dev/null || true
+else
+  # Tee output so a `tmux attach -t pi-delegate` pane shows live progress
+  # while still capturing everything to the result file. Use PIPESTATUS so
+  # pipefail doesn't mask the sub-agent's exit code with tee's, and `|| true`
+  # so a non-zero sub-agent exit doesn't trigger `set -e` before we record it.
+  # (Sequential fallback callers should redirect dispatch.sh's stdout to avoid
+  # interleaving multiple sub-agents into the orchestrator's terminal.)
+  "${TIMEOUT_CMD[@]}" "${PI_CMD[@]}" 2>&1 | tee -a "$RESULT_FILE" || true
+  EXIT_CODE=${PIPESTATUS[0]}
+fi
 
 # Record exit code
 echo "$EXIT_CODE" > "$EXIT_FILE"
