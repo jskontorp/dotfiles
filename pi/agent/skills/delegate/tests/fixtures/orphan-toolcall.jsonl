@@ -1,0 +1,1 @@
+{"type":"message","message":{"role":"assistant","stopReason":"stop","content":[{"type":"toolCall","id":"call_orphan"},{"type":"text","text":"partial"}]}}
