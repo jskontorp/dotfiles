@@ -48,7 +48,31 @@ mkdir -p ~/.config/git
 _link "$DOTFILES/shared/gitignore_global" ~/.config/git/ignore
 _linkd "$DOTFILES/shared/nvim"          ~/.config/nvim
 _link "$DOTFILES/pi/agent/AGENTS.md"    ~/.pi/agent/AGENTS.md
-_link "$DOTFILES/pi/agent/settings.json" ~/.pi/agent/settings.json
+# pi/agent/settings.json is materialised as a real file (not a symlink) so
+# pi's runtime mutations — currently `lastChangelogVersion`, possibly more
+# in the future — don't dirty the dotfiles repo every release. Merge
+# semantics: dotfiles wins for keys it tracks; pi-only keys present on
+# disk are preserved. If you ever need to delete a tracked key, delete it
+# in both places (or rm the live file and re-run install.sh).
+pi_settings_src="$DOTFILES/pi/agent/settings.json"
+pi_settings_dst="$HOME/.pi/agent/settings.json"
+# Migration: replace stale symlink from older installs with a real file.
+[[ -L "$pi_settings_dst" ]] && rm "$pi_settings_dst"
+if [[ -f "$pi_settings_dst" ]]; then
+  python3 - "$pi_settings_dst" "$pi_settings_src" <<'PYEOF'
+import json, sys
+live, src = sys.argv[1], sys.argv[2]
+with open(live) as f:
+    merged = json.load(f)
+with open(src) as f:
+    merged.update(json.load(f))
+with open(live, "w") as f:
+    json.dump(merged, f, indent=2)
+    f.write("\n")
+PYEOF
+else
+  cp "$pi_settings_src" "$pi_settings_dst"
+fi
 _link "$DOTFILES/pi/agent/models.json"   ~/.pi/agent/models.json
 # Replace old whole-directory symlink with a real directory
 [[ -L ~/.pi/agent/skills ]] && rm ~/.pi/agent/skills
