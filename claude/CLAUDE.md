@@ -19,4 +19,8 @@ Several side-effect skills carry `disable-model-invocation: true` — Claude won
 
 The shared AGENTS.md `# Destructive actions` section is the policy and applies fully. Claude-specific: the `Bash` tool is the main vector. If a call is blocked by the harness's permission layer, report the denial and stop — do not retry with quoting tricks (`bash -c "…"`), wrapper commands, alternative shells, or by writing a script file and executing it. The deny is the user's standing policy, not a puzzle to route around.
 
+**On `permissions.deny` in `settings.json`:** the list is best-effort string matching against the literal command, not a semantic parser. `rm -rf ~` (no slash), `rm -rf "$HOME"`, `rm -rf /Users/<name>`, and `git push origin main --force` (flag after positional args) all bypass the listed patterns. Treat `permissions.deny` as a tripwire for the most-typed forms, not a guarantee. AGENTS.md `# Destructive actions` is the binding rule; the JSON list is decoration.
+
+**On `skipAutoPermissionPrompt: true`:** this disables Claude's prompt-on-unknown-command. Combined with the leaky deny list above, the practical security posture is "AGENTS.md compliance + best-effort string match." Set deliberately because the user runs Claude in auto-accept mode often and visually tracks which mode is active; the prompt would be friction more than signal. If you find yourself relying on the prompt to catch a destructive call, the prompt isn't there — re-read AGENTS.md instead.
+
 @$DOTFILES/pi/agent/AGENTS.md
