@@ -375,6 +375,109 @@ check:
       printf "  — skipped on non-Darwin\n"
     fi
 
+# Probe the runtime preconditions an agentic session needs: tool versions on
+# PATH, $DOTFILES env matches this checkout, manifest symlinks intact, Claude
+# plugins materialised against settings.json's enabledPlugins, and the
+# notion-routing cwd→auth-file mapping behaves. No network calls; no keychain
+# probing (those surface naturally when used). Exit non-zero on any failure.
+[group('test')]
+doctor:
+    #!/usr/bin/env bash
+    set -uo pipefail
+    rc=0
+    ok()   { printf "  ✅ %s\n" "$1"; }
+    warn() { printf "  ⚠  %s\n" "$1"; }
+    fail() { printf "  ❌ %s\n" "$1"; rc=1; }
+
+    printf "versions:\n"
+    for tool in pi claude node python3 jq zsh; do
+      if command -v "$tool" >/dev/null 2>&1; then
+        ver=$("$tool" --version 2>&1 | head -1 | awk '{for(i=1;i<=NF;i++) if ($i ~ /[0-9]/) { print $i; exit }}')
+        ok "$tool ${ver:-(version unparsed)}"
+      else
+        fail "$tool: not on PATH"
+      fi
+    done
+
+    printf "\n\$DOTFILES env:\n"
+    if [[ -z "${DOTFILES:-}" ]]; then
+      warn "\$DOTFILES not exported in this shell (zsh/core.zsh sets it; ok if you're in a non-zsh shell)"
+    elif [[ "$DOTFILES" != "{{DOTFILES}}" ]]; then
+      fail "\$DOTFILES=$DOTFILES but justfile_directory() is {{DOTFILES}} (moved checkout? re-source ~/.zshrc)"
+    else
+      ok "\$DOTFILES=$DOTFILES"
+    fi
+
+    printf "\nsymlinks:\n"
+    log=$(mktemp)
+    if bash {{DOTFILES}}/test/validate-manifest.sh > "$log" 2>&1; then
+      n=$(grep -c '^  ✅' "$log" || true)
+      ok "manifest validated ($n entries)"
+    else
+      tail -10 "$log" >&2
+      fail "manifest validation failed (run 'just check' for full output)"
+    fi
+    rm -f "$log"
+
+    printf "\nclaude plugins:\n"
+    settings="$HOME/.claude/settings.json"
+    installed="$HOME/.claude/plugins/installed_plugins.json"
+    if [[ ! -f "$settings" ]]; then
+      fail "$settings missing — run 'just link'"
+    elif [[ ! -f "$installed" ]]; then
+      warn "$installed missing — run 'just claude-plugins-install'"
+    else
+      while IFS= read -r plugin; do
+        [[ -z "$plugin" ]] && continue
+        if jq -e --arg p "$plugin" '.plugins[$p] // empty' "$installed" >/dev/null 2>&1; then
+          ok "$plugin"
+        else
+          warn "$plugin enabled in settings.json but not in installed_plugins.json (run 'just claude-plugins-install')"
+        fi
+      done < <(jq -r '.enabledPlugins | to_entries[] | select(.value) | .key' "$settings")
+    fi
+
+    printf "\nnotion routing (cwd → auth file):\n"
+    if ! command -v zsh >/dev/null 2>&1; then
+      warn "zsh not on PATH — skipping (routing source is zsh-only)"
+    else
+      check_route() {
+        local cwd="$1" expected="$2"
+        local got
+        got=$(zsh -c "source {{DOTFILES}}/zsh/pi-notion-routing.zsh && _pi_notion_auth_file '$cwd'" 2>/dev/null)
+        local exp_label="${expected##*/}"
+        [[ -z "$expected" ]] && exp_label="(unset)"
+        local got_label="${got##*/}"
+        [[ -z "$got" ]] && got_label="(unset)"
+        if [[ "$got" == "$expected" ]]; then
+          ok "$cwd → $exp_label"
+        else
+          fail "$cwd → got $got_label, expected $exp_label"
+        fi
+      }
+      check_route "$HOME/code/personal/foo"         "$HOME/.pi/agent/notion-mcp-auth-personal.json"
+      check_route "$HOME/code/work/volve-ai"        "$HOME/.pi/agent/notion-mcp-auth-volve.json"
+      check_route "$HOME/code/personal/volve-notes" "$HOME/.pi/agent/notion-mcp-auth-personal.json"
+      check_route "$HOME/tmp/random"                ""
+    fi
+
+    printf "\nlinear routing extension:\n"
+    ext="$HOME/.pi/agent/extensions/linear-routing.ts"
+    if [[ -L "$ext" && -e "$ext" ]]; then
+      target=$(readlink "$ext")
+      ok "linear-routing.ts → ${target#$HOME/}"
+    else
+      fail "$ext missing or broken (run 'just link')"
+    fi
+
+    printf "\n"
+    if [[ $rc -eq 0 ]]; then
+      printf "✅ doctor: all checks passed\n"
+    else
+      printf "❌ doctor: issues found above\n" >&2
+    fi
+    exit $rc
+
 # Run dotfiles install validation in Docker (full integration). For fast
 # skill unit tests, use `just test-skills` / `just test-skill <name>`.
 [group('test')]
