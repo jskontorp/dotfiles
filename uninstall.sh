@@ -83,7 +83,8 @@ fi
 # --- Footer: things uninstall does NOT touch ---
 cat <<EOF
 
-Not touched (clean up manually if you also want these gone):
+Not touched (clean up manually if you also want these gone, or run
+  `just uninstall-full --yes` on Mac for the nuclear option):
 
   Real files written by install.sh (intentionally outside the manifest):
     ~/.pi/agent/settings.json   # pi runtime state (lastChangelogVersion, etc.)

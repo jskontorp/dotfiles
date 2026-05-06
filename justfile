@@ -273,9 +273,17 @@ link:
 # Reverse install.sh: remove every symlink recorded in .install-manifest.
 # Idempotent. The manifest is the contract — see uninstall.sh's footer
 # for the things this does NOT touch (pnpm globals, Brewfile, tmux/claude
-# plugins, ~/.gitconfig.local, etc.).
+# plugins, ~/.gitconfig.local, etc.). For a full Mac tear-down including
+# brew + plugin caches + pi/Claude state, see `just uninstall-full`.
 uninstall:
     {{DOTFILES}}/uninstall.sh
+
+# Nuclear uninstall (Mac-only): reverse install.sh AND remove Brewfile
+# packages, pnpm globals, plugin caches, OrbStack runtime, pi credentials
+# and sessions. Preserves ~/.gitconfig.local, ~/.zsh_history, and the
+# dotfiles checkout. Requires --yes (no interactive prompt). Idempotent.
+uninstall-full *args:
+    {{DOTFILES}}/uninstall-full.sh {{args}}
 
 # Show unified pi skill inventory: name, scope, source, description
 skills:
