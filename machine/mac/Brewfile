@@ -27,6 +27,7 @@ brew "node"
 brew "pnpm"
 brew "just"
 brew "shellcheck"       # pre-commit lint for *.sh
+brew "libpq"           # psql/pg_dump client (keg-only; PATH set in zsh/core.zsh)
 
 # GUI apps
 cask "ghostty"

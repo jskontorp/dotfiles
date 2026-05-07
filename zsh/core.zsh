@@ -64,6 +64,14 @@ if [[ -n "${PNPM_HOME:-}" ]]; then
   esac
 fi
 
+# libpq (keg-only) — psql/pg_dump client tools without the full server
+if [[ -d /opt/homebrew/opt/libpq/bin ]]; then
+  case ":$PATH:" in
+    *":/opt/homebrew/opt/libpq/bin:"*) ;;
+    *) export PATH="/opt/homebrew/opt/libpq/bin:$PATH" ;;
+  esac
+fi
+
 # --- Terminal integration ---
 # Emit OSC 7 so Ghostty and other terminals know the cwd for new tabs/splits
 autoload -Uz add-zsh-hook
