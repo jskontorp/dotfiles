@@ -42,9 +42,13 @@ case ":$PATH:" in
 esac
 
 # pnpm global bin — platform default per pnpm docs.
-# pnpm ≥10 places global bin shims under $PNPM_HOME/bin (older versions
-# used $PNPM_HOME directly). Set explicitly so fresh shells work without
-# relying on `pnpm setup` having mutated this file. Idempotent.
+# pnpm ≥10 places globally-added shims under $PNPM_HOME/bin (older versions
+# used $PNPM_HOME directly), but the standalone installer still drops
+# `pnpm` itself at $PNPM_HOME/pnpm, and pre-pnpm-10 shims (e.g. `pi`,
+# `claude` installed before the migration) may still live at the legacy
+# location. Keep both on PATH so fresh shells resolve every binary
+# regardless of when it was installed. Mirrors `justfile` [linux] update.
+# Idempotent.
 case "$(uname -s)" in
   Darwin) export PNPM_HOME="$HOME/Library/pnpm" ;;
   Linux)  export PNPM_HOME="$HOME/.local/share/pnpm" ;;
@@ -53,6 +57,10 @@ if [[ -n "${PNPM_HOME:-}" ]]; then
   case ":$PATH:" in
     *":$PNPM_HOME/bin:"*) ;;
     *) export PATH="$PNPM_HOME/bin:$PATH" ;;
+  esac
+  case ":$PATH:" in
+    *":$PNPM_HOME:"*) ;;
+    *) export PATH="$PNPM_HOME:$PATH" ;;
   esac
 fi
 
