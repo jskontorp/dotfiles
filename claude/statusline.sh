@@ -11,9 +11,8 @@ RESET=$'\e[0m'
 TEXT=$'\e[38;2;202;211;245m'   # #cad3f5 — directory / model
 PEACH=$'\e[38;2;245;169;127m'  # #f5a97f — branch / mid zone
 MUTED=$'\e[38;2;165;173;203m'  # #a5adcb — git flags
-GREEN=$'\e[38;2;166;218;149m'  # #a6da95 — ok zone
-RED=$'\e[38;2;237;135;150m'    # #ed8796 — danger zone
 SEP=$'\e[38;2;110;115;141m'    # #6e738d — separators
+# Gradient endpoints (#a6da95 green, #ed8796 red) are inlined in zone_color.
 
 # --- Pull fields, one per line so empty lines are preserved (bash 3.2 has no
 #     mapfile, and whitespace IFS in `read` would collapse leading empty fields).
@@ -57,31 +56,33 @@ if GIT_OPTIONAL_LOCKS=0 git -C "$cwd" rev-parse --show-toplevel >/dev/null 2>&1;
   echo "$hdr" | grep -q 'behind' && flags+="⇣"
 fi
 
-# --- Threshold-based color. 80% is auto-compaction; 60% is a soft warning. ---
+# --- Gradient color: green ≤10%, linear ramp to red at 80%, red beyond.
+#     Endpoints match Catppuccin Macchiato green (#a6da95) and red (#ed8796). ---
 zone_color() {
   local pct=${1%.*}
   [ -z "$pct" ] && { printf '%s' "$MUTED"; return; }
-  if   [ "$pct" -ge 80 ]; then printf '%s' "$RED"
-  elif [ "$pct" -ge 60 ]; then printf '%s' "$PEACH"
-  else                         printf '%s' "$GREEN"
+  local r g b
+  if   [ "$pct" -le 10 ]; then r=166; g=218; b=149
+  elif [ "$pct" -ge 80 ]; then r=237; g=135; b=150
+  else
+    # t = (pct-10)/70, scaled by 1000 for integer math.
+    local t=$(( (pct - 10) * 1000 / 70 ))
+    r=$(( 166 + t * (237 - 166) / 1000 ))
+    g=$(( 218 + t * (135 - 218) / 1000 ))
+    b=$(( 149 + t * (150 - 149) / 1000 ))
   fi
+  printf '\e[38;2;%d;%d;%dm' "$r" "$g" "$b"
 }
 
-# --- 21-char bar: 20 fill cells (5% each) with a tick inserted at the 80% mark. ---
+# --- 20-cell bar, 5% per cell. ---
 make_bar() {
   local pct=${1:-0}; pct=${pct%.*}; [ -z "$pct" ] && pct=0
   local cells=20
-  local mark=16
   local fill=$(( pct * cells / 100 ))
   [ "$fill" -gt "$cells" ] && fill=$cells
   local i out=""
-  for ((i=0; i<=cells; i++)); do
-    if   [ "$i" -eq "$mark" ]; then out+="│"
-    else
-      local idx=$i
-      [ "$i" -gt "$mark" ] && idx=$((i-1))
-      if [ "$idx" -lt "$fill" ]; then out+="█"; else out+="░"; fi
-    fi
+  for ((i=0; i<cells; i++)); do
+    if [ "$i" -lt "$fill" ]; then out+="█"; else out+="░"; fi
   done
   printf '%s' "$out"
 }
