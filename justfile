@@ -237,8 +237,10 @@ status:
 [linux]
 status:
     #!/usr/bin/env bash
-    # pnpm ≥10 puts global bins under $PNPM_HOME/bin (older: $PNPM_HOME).
-    export PATH="$HOME/.local/bin:$HOME/.local/share/fnm:$HOME/.local/share/pnpm/bin:$PATH"
+    # pnpm ≥10 puts global bins under $PNPM_HOME/bin, but the standalone
+    # installer drops the `pnpm` binary itself at $PNPM_HOME (no /bin).
+    # Keep both on PATH — matches zsh/core.zsh (see commit 271471e).
+    export PATH="$HOME/.local/bin:$HOME/.local/share/fnm:$HOME/.local/share/pnpm:$HOME/.local/share/pnpm/bin:$PATH"
     command -v fnm &>/dev/null && eval "$(fnm env)"
     printf "%-12s %s\n" "os"       "$(lsb_release -ds)"
     printf "%-12s %s\n" "kernel"   "$(uname -r)"
