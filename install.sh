@@ -134,8 +134,22 @@ _link "$DOTFILES/claude/statusline.sh" ~/.claude/statusline.sh
 
 for skill in "$DOTFILES/pi/agent/skills"/*/; do
   [[ ! -d "$skill" ]] && continue
-  _claude_skill_excluded "$skill" && continue
-  _linkd "$skill" ~/.claude/skills/"$(basename "$skill")"
+  name="$(basename "$skill")"
+  if _claude_skill_excluded "$skill"; then
+    # Sweep prior mirror if the skill was previously claude-compatible. The
+    # broken-symlink prune above only catches dangling links; reverting a
+    # `claude-compatible: true → false` flip leaves a *live* symlink whose
+    # target still exists. Same regression class as 1d4069d (skill-scope
+    # migration leaves orphan symlinks). Only remove if it's a symlink we
+    # own, i.e. points back into $DOTFILES — don't touch user content.
+    mirror=~/.claude/skills/"$name"
+    if [[ -L "$mirror" ]]; then
+      target="$(readlink "$mirror")"
+      [[ "$target" == "$DOTFILES"/* ]] && rm -f "$mirror"
+    fi
+    continue
+  fi
+  _linkd "$skill" ~/.claude/skills/"$name"
 done
 
 # Mirror Claude-native subagents (dotfiles/claude/agents/*.md) into ~/.claude/agents/.
