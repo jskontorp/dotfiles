@@ -27,11 +27,21 @@ Shell state doesn't persist. **Every bash block must start with:**
 
 ```bash
 DELEGATE_DIR=".pi-delegate"
-RESULTS_DIR="$DELEGATE_DIR/results"
-STATUS_FILE="$DELEGATE_DIR/status.json"
-PLAN_FILE="$DELEGATE_DIR/plan.md"
+BATCH_DIR="$DELEGATE_DIR/$BATCH"        # set after Phase 2 allocation
+RESULTS_DIR="$BATCH_DIR/results"
+STATUS_FILE="$BATCH_DIR/status.json"
+PLAN_FILE="$BATCH_DIR/plan.md"
 SKILL_DIR="$(cd ~/.pi/agent/skills/delegate && pwd)"
 ```
+
+Orchestration outputs (plan, status, prompts, results, sessions, synthesis)
+live under `$BATCH_DIR`. Inputs authored by the user (e.g. `proposal.md` for
+`triple-review`) stay at `$DELEGATE_DIR` top-level so they're re-usable across
+runs. `$BATCH` is allocated in Phase 2 via the shared atomic-`mkdir` idiom and
+is **independent** of the tmux window name (`$TMUX_BATCH`, allocated in Phase
+3) — the two namespaces have different lifetimes (tmux session is per-machine,
+`.pi-delegate/` is per-cwd) and coupling them produces duplicate tmux window
+names cross-cwd.
 
 ## Phase 1 — Decompose
 
@@ -81,9 +91,25 @@ Do NOT include: the full conversation history, other tasks' descriptions, or the
 
 ## Phase 2 — Setup
 
-After approval, create the working directory:
+After approval, allocate a fresh batch directory under `.pi-delegate/`. Atomic
+`mkdir` (no `-p`) with retry-on-collision is the concurrency primitive — two
+racing orchestrators in the same cwd both see e.g. `N=2`, only one of their
+`mkdir batch-3` calls succeeds, the loser re-reads and tries `batch-4`.
 
 ```bash
+mkdir -p "$DELEGATE_DIR"
+
+# Allocate next free batch dir. The 2>/dev/null on `ls` is load-bearing —
+# without nullglob set, no-match would emit a literal `batch-*`.
+while true; do
+  N=$(ls -1d "$DELEGATE_DIR"/batch-* 2>/dev/null | sed -E 's|.*/batch-||' | sort -n | tail -1)
+  BATCH="batch-$(( ${N:-0} + 1 ))"
+  mkdir "$DELEGATE_DIR/$BATCH" 2>/dev/null && break
+done
+BATCH_DIR="$DELEGATE_DIR/$BATCH"
+RESULTS_DIR="$BATCH_DIR/results"
+STATUS_FILE="$BATCH_DIR/status.json"
+PLAN_FILE="$BATCH_DIR/plan.md"
 mkdir -p "$RESULTS_DIR"
 
 # Exclude from git (not .gitignore)
@@ -94,7 +120,7 @@ if [ -n "$GIT_EXCLUDE" ]; then
 fi
 ```
 
-Write `plan.md` with the approved plan. Initialise `status.json`:
+Write `$PLAN_FILE` with the approved plan. Initialise `$STATUS_FILE`:
 
 ```json
 [
@@ -105,9 +131,29 @@ Write `plan.md` with the approved plan. Initialise `status.json`:
 
 ### Resume check
 
-If `$DELEGATE_DIR/plan.md` exists with incomplete tasks, **ask the user**: resume or start fresh?
+Before allocating a new batch, scan `$DELEGATE_DIR/batch-*/plan.md` for
+incomplete runs and **ask the user**: resume one, or start fresh?
 
-To resume: read `status.json`, skip tasks with `"status": "completed"`, re-run `"failed"` or `"pending"` tasks.
+```bash
+for d in $(ls -1d "$DELEGATE_DIR"/batch-* 2>/dev/null \
+            | sed -E 's|.*/batch-||' | sort -n | sed -E "s|^|$DELEGATE_DIR/batch-|"); do
+  [ -f "$d/plan.md" ] || continue
+  # Surface $(basename $d) plus any non-completed task IDs from $d/status.json
+done
+```
+
+To resume: skip the allocation block above, set `BATCH=batch-<chosen>` and
+`BATCH_DIR="$DELEGATE_DIR/$BATCH"`, read `$STATUS_FILE`, skip tasks with
+`"status": "completed"`, re-run `"failed"` or `"pending"` tasks.
+
+Default to **start a new batch** — resume is opt-in.
+
+### Migration note
+
+If `$DELEGATE_DIR/{plan.md,status.json,results,*-prompt.txt}` exists at the
+top level from a pre-batch version of this skill, leave it in place — the new
+code path doesn't read it. Ask the user before removing it; don't `rm` it
+autonomously.
 
 ## Phase 3 — Dispatch
 
@@ -123,18 +169,24 @@ command -v tmux &>/dev/null && echo "tmux available" || echo "tmux unavailable"
 
 If tmux is available, reuse the `pi-delegate` session if one already exists
 (another delegate or `triple-review` batch may be in flight) and pick the
-next free `batch-N` window so we don't clobber a parallel agent's panes.
-Use `sed -E` for BSD/macOS portability — BRE `\+` is not supported there.
+next free `batch-N` **window** name so we don't clobber a parallel agent's
+panes. Use `sed -E` for BSD/macOS portability — BRE `\+` is not supported
+there.
+
+This probe is **independent** of the FS batch ID allocated in Phase 2.
+Don't reuse `$BATCH` as the tmux window name — across two different cwds,
+the FS side allocates `batch-1` twice (each `.pi-delegate/` is fresh) while
+the tmux session must keep window names unique. Allocate them separately.
 
 ```bash
 if tmux has-session -t pi-delegate 2>/dev/null; then
   N=$(tmux list-windows -t pi-delegate -F '#{window_name}' 2>/dev/null \
       | sed -E -n 's/^batch-([0-9]+).*$/\1/p' | sort -n | tail -1)
-  BATCH="batch-$(( ${N:-0} + 1 ))"
-  tmux new-window -t pi-delegate -n "$BATCH"
+  TMUX_BATCH="batch-$(( ${N:-0} + 1 ))"
+  tmux new-window -t pi-delegate -n "$TMUX_BATCH"
 else
-  BATCH="batch-1"
-  tmux new-session -d -s pi-delegate -n "$BATCH"
+  TMUX_BATCH="batch-1"
+  tmux new-session -d -s pi-delegate -n "$TMUX_BATCH"
 fi
 ```
 
@@ -143,10 +195,10 @@ For each task in a parallel batch (max 4 per window):
 ```bash
 # First task gets the existing pane; subsequent tasks split
 if [ "$PANE_INDEX" -eq 0 ]; then
-  tmux send-keys -t "pi-delegate:$BATCH" "$SKILL_DIR/scripts/dispatch.sh TASK_ID TASK_DIR TASK_TIMEOUT TASK_PROMPT_FILE RESULTS_DIR TASK_MODEL TASK_TOOLS" Enter
+  tmux send-keys -t "pi-delegate:$TMUX_BATCH" "$SKILL_DIR/scripts/dispatch.sh TASK_ID TASK_DIR TASK_TIMEOUT TASK_PROMPT_FILE RESULTS_DIR TASK_MODEL TASK_TOOLS" Enter
 else
-  tmux split-window -t "pi-delegate:$BATCH" "$SKILL_DIR/scripts/dispatch.sh TASK_ID TASK_DIR TASK_TIMEOUT TASK_PROMPT_FILE RESULTS_DIR TASK_MODEL TASK_TOOLS"
-  tmux select-layout -t "pi-delegate:$BATCH" tiled
+  tmux split-window -t "pi-delegate:$TMUX_BATCH" "$SKILL_DIR/scripts/dispatch.sh TASK_ID TASK_DIR TASK_TIMEOUT TASK_PROMPT_FILE RESULTS_DIR TASK_MODEL TASK_TOOLS"
+  tmux select-layout -t "pi-delegate:$TMUX_BATCH" tiled
 fi
 ```
 
@@ -171,7 +223,12 @@ that need the full transcript, read `$DELEGATE_DIR/sessions/${TASK_ID}/`.
 The watcher caps its wait at `TIMEOUT + 30s` so dispatch.sh's `wait` never
 hangs on an externally killed pi.
 
-Tell the user: **`Watch live: tmux attach -t pi-delegate`**
+Tell the user, printing both names explicitly (no claim of equality):
+
+```
+Watch live: tmux attach -t pi-delegate \; select-window -t pi-delegate:$TMUX_BATCH
+FS outputs: $BATCH_DIR/
+```
 
 ### Sequential fallback (no tmux)
 
@@ -187,10 +244,11 @@ wait
 
 ### Prompt files
 
-Write each task's prompt to a temp file before dispatch (prompts may be multi-line and contain special characters):
+Write each task's prompt to a temp file under `$BATCH_DIR` before dispatch
+(prompts may be multi-line and contain special characters):
 
 ```bash
-PROMPT_FILE="$DELEGATE_DIR/${TASK_ID}-prompt.txt"
+PROMPT_FILE="$BATCH_DIR/${TASK_ID}-prompt.txt"
 # Write prompt via the Write tool, then pass path to dispatch.sh
 ```
 
@@ -222,7 +280,7 @@ If a task timed out, `status.json` shows `"status": "timeout"`. The result file 
 
 ## Phase 5 — Synthesise
 
-Read all result files. Write `$DELEGATE_DIR/synthesis.md`:
+Read all result files. Write `$BATCH_DIR/synthesis.md`:
 
 ```markdown
 # Delegation Results
@@ -266,7 +324,18 @@ After the user reviews the synthesis, they may:
 
 ### Clean up
 
-After the user is done (or on explicit request):
+Default cleanup acts on **this batch only** so concurrent runs aren't
+clobbered:
+
+```bash
+tmux kill-window -t "pi-delegate:$TMUX_BATCH" 2>/dev/null || true
+rm -rf "$BATCH_DIR"
+# If $BATCH_DIR was the last one and the user wants the dir gone:
+# rmdir "$DELEGATE_DIR" 2>/dev/null || true
+```
+
+"Clean everything" (whole `.pi-delegate/` + whole tmux session) is opt-in
+and only on explicit request:
 
 ```bash
 tmux kill-session -t pi-delegate 2>/dev/null || true
