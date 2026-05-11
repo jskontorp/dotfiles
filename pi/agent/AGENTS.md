@@ -60,6 +60,8 @@ When the user asks for an ELIND, don't produce a separate simplified section. In
 When the user includes NAJA in a prompt, treat it as a discussion — not a go-signal.
 Do not edit, write, or execute commands. Reading files to inform the answer is fine.
 
+Action requests are phrased imperatively. Prompts ending in `?` are questions — answer them, don't act silently.
+
 # SKILL.md frontmatter
 
 Recognised fields (both agents ignore unknown keys, so it is safe to set agent-specific fields in any SKILL.md):
