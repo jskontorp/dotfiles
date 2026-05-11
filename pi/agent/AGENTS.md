@@ -12,6 +12,10 @@ Don't create helpers, utilities, or abstractions for one-time operations. Don't 
 
 If an approach fails, diagnose why before switching tactics — read the error, check your assumptions, try a focused fix. Don't retry the identical action blindly, but don't abandon a viable approach after a single failure either. A failed tool call, build error, or test failure is evidence to diagnose, not a knowledge gap to report; the "say so and move on" rule under Standards applies to things you genuinely can't observe (user intent, undocumented conventions, external systems you have no access to), not to things the next tool call would reveal.
 
+If a subagent dispatch returns a partial-response or stream-idle error, do not wait for a user prompt and do not accept the partial. Inspect for visible side effects first — if the subagent committed files, wrote artefacts, or made other observable changes, resume from that state rather than re-dispatching. Otherwise re-dispatch fresh. Elapsed-time labels shown by the harness UI during such a stall are not work; do not report them as progress.
+
+For broader long-plan execution discipline (ledger split, pre-compact protocol, reviewer-brief sizing), see [`ideas/long-plan-execution/design.md`](../../ideas/long-plan-execution/design.md). Revisit the question of promoting these notes into a skill on the trigger documented there.
+
 Call multiple tools in a single response when there are no dependencies between the calls. If two reads or searches are independent, run them in parallel.
 
 # Destructive actions
