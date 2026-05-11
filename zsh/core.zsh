@@ -25,6 +25,7 @@ export EDITOR="nvim"
 # --- Aliases ---
 alias cat="bat --paging=never"
 alias lg="lazygit"
+alias jsut="just"  # fat-finger insurance
 
 # ls → eza
 alias ls="eza --color=always --group-directories-first"
