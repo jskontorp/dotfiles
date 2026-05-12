@@ -13,6 +13,10 @@ default:
 odev:
     ssh -t oracle tmux attach -t odev
 
+# Attach to the local `dev` tmux session.
+dev:
+    tmux a -t dev
+
 # --- Defaults ------------------------------------------------------------
 
 # Re-run dotfiles install (idempotent).
