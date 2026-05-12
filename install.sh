@@ -508,17 +508,51 @@ for pdir in "$DOTFILES/projects"/*/; do
   done
 
   # Files at the project root (e.g. justfile) — symlink into every git
-  # worktree of the candidate repo. .path is metadata, not content. Future
-  # worktrees: re-run `just link` after `git worktree add`.
+  # worktree of the candidate repo. .path is metadata, not content;
+  # git-exclude is handled separately below. Future worktrees: re-run
+  # `just link` after `git worktree add`.
   for f in "$pdir"*; do
     [[ ! -f "$f" ]] && continue
     fname="$(basename "$f")"
-    [[ "$fname" == ".path" ]] && continue
+    [[ "$fname" == ".path" || "$fname" == "git-exclude" ]] && continue
     while IFS= read -r wt; do
       [[ -z "$wt" ]] && continue
       _link "$f" "$wt/$fname"
     done < <(command git -C "$candidate" worktree list --porcelain 2>/dev/null | awk '/^worktree/ {print $2}')
   done
+
+  # Per-repo git excludes — content from projects/<name>/git-exclude is
+  # injected as a managed block into the repo's shared .git/info/exclude
+  # (shared across all worktrees, so written once per repo). Idempotent:
+  # re-running strips any prior managed block before re-appending.
+  # Not tracked in $INSTALL_MANIFEST (manifest = symlinks only); removal
+  # is by deleting the marked block manually or via the markers below.
+  exclude_src="$pdir/git-exclude"
+  if [[ -f "$exclude_src" ]]; then
+    common_dir="$(command git -C "$candidate" rev-parse --git-common-dir 2>/dev/null)"
+    if [[ -n "$common_dir" ]]; then
+      [[ "$common_dir" != /* ]] && common_dir="$candidate/$common_dir"
+      exclude_dst="$common_dir/info/exclude"
+      mkdir -p "$(dirname "$exclude_dst")"
+      [[ ! -f "$exclude_dst" ]] && touch "$exclude_dst"
+      marker_begin="# >>> dotfiles managed (projects/$name/git-exclude) >>>"
+      marker_end="# <<< dotfiles managed <<<"
+      tmp="$(mktemp)"
+      awk -v b="$marker_begin" -v e="$marker_end" '
+        $0 == b { skip=1; next }
+        skip && $0 == e { skip=0; next }
+        !skip { print }
+      ' "$exclude_dst" > "$tmp"
+      {
+        cat "$tmp"
+        printf '%s\n' "$marker_begin"
+        cat "$exclude_src"
+        printf '%s\n' "$marker_end"
+      } > "$exclude_dst"
+      rm -f "$tmp"
+      echo "  → injected git-exclude block into $exclude_dst"
+    fi
+  fi
 done
 
 # --- Git hooks (for the dotfiles repo itself) ---
