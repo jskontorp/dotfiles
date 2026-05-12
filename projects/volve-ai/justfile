@@ -61,6 +61,64 @@ db-check:
     uv run alembic current
     uv run alembic heads
 
+# Pull this branch's per-branch Neon connection string from GCP Secret Manager
+# (provisioned by Mouhaned's #1344 cloudbuild.yaml) and rewrite .env.dev's
+# PG_CONN_STRING so the local backend hits the same DB the cloud branch
+# revision + job use. Slug derivation mirrors cloudbuild.yaml's "Prepare
+# variables" step exactly — keep in sync if that step changes.
+[doc("Rewrite .env.dev's PG_CONN_STRING with this branch's per-branch Neon secret from GCP.")]
+db-from-cloud:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    branch="$(git rev-parse --abbrev-ref HEAD)"
+    if [ "$branch" = "HEAD" ]; then
+        echo "Error: detached HEAD — checkout a branch first." >&2
+        exit 1
+    fi
+    case "$branch" in
+        develop|main|master)
+            echo "Error: '$branch' is a shared branch — point at pg-conn-string-dev or pg-conn-string-prod manually." >&2
+            exit 1
+            ;;
+    esac
+    if [ ! -f .env.dev ]; then
+        echo "Error: .env.dev not found — run ./switch_env.sh dev first." >&2
+        exit 1
+    fi
+    # Mirror of cloudbuild.yaml "Prepare variables": lowercase, non-alphanumeric
+    # → '-', strip leading/trailing '-', empty → 'build', truncate >28 chars to
+    # 23-char prefix + '-' + 4-char md5 hash (commit 13adad19).
+    slug="$(echo "$branch" | tr '[:upper:]' '[:lower:]' | sed -E 's|[^a-z0-9]+|-|g' | sed -E 's|^-+||; s|-+$||')"
+    [ -z "$slug" ] && slug="build"
+    if [ "${#slug}" -gt 28 ]; then
+        short_hash="$(echo -n "$slug" | md5sum | cut -c1-4)"
+        slug="${slug:0:23}-${short_hash}"
+    fi
+    secret="pg-conn-string-${slug}"
+    project="gen-lang-client-0672483912"
+    echo "Branch: $branch"
+    echo "Slug:   $slug"
+    echo "Secret: $secret"
+    if ! conn="$(gcloud secrets versions access latest --secret="$secret" --project="$project" 2>&1)"; then
+        if printf '%s' "$conn" | grep -qE "NOT_FOUND|was not found"; then
+            echo "Error: no per-branch secret for ${slug} — push the branch and wait for Cloud Build to provision ${secret}, then retry." >&2
+        elif printf '%s' "$conn" | grep -qE "PERMISSION_DENIED|IAM_PERMISSION_DENIED"; then
+            # Note: gcloud collapses 403/404 to avoid leaking secret existence,
+            # so this may also fire for a missing secret if the caller lacks list perms.
+            echo "Error: missing IAM permission on ${secret} — request roles/secretmanager.secretAccessor on project ${project} (or on the secret)." >&2
+        else
+            echo "Error from gcloud:" >&2
+            printf '%s\n' "$conn" >&2
+        fi
+        exit 1
+    fi
+    # Escape sed-special chars in the replacement (\ and &). Outer s-command
+    # uses '|' as delimiter; Neon URLs don't contain '|'.
+    escaped="$(printf '%s' "$conn" | sed -e 's#[\\&]#\\&#g')"
+    sed -i '' "s|^PG_CONN_STRING=.*|PG_CONN_STRING=${escaped}|" .env.dev
+    echo "Wrote PG_CONN_STRING to .env.dev"
+    echo "Restart uvicorn for the change to take effect."
+
 # --- Tests ---
 
 # Run unit tests (integration excluded by [tool.pytest.ini_options] in pyproject.toml). Forwards args: just test path/to/test.py::name -v
