@@ -9,13 +9,14 @@ set shell := ["bash", "-uc"]
 default:
     @just --justfile {{justfile()}} --list
 
-# Attach to the `odev` tmux session on the oracle host.
+# Attach to the oracle `odev` tmux session — locally on oracle, via ssh from mac.
 odev:
-    ssh -t oracle tmux attach -t odev
+    @if [[ "$(uname -s)" == "Linux" ]]; then tmux a -t odev; else ssh -t oracle tmux attach -t odev; fi
 
-# Attach to the local `dev` tmux session.
+# Attach to the mac `dev` tmux session — only meaningful on mac.
 dev:
-    tmux a -t dev
+    @[[ "$(uname -s)" == "Darwin" ]] || { echo "'dev' is the mac session; use 'gust odev' on linux" >&2; exit 1; }
+    @tmux a -t dev
 
 # --- Defaults ------------------------------------------------------------
 
