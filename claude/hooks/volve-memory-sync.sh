@@ -24,12 +24,15 @@ MAC_DIR="$HOME/.claude/projects/-Users-jorgens-kontorp-code-work-volve-ai/memory
 ORACLE_DIR_ON_ORACLE="$HOME/.claude/projects/-home-ubuntu-code-work-volve-ai/memory/"
 ORACLE_DIR_VIA_MAC="oracle:.claude/projects/-home-ubuntu-code-work-volve-ai/memory/"
 
-# Only sync when the active Claude session is inside a volve-ai project —
-# keeps the hook silent + skips a network round-trip for unrelated work.
-case "${CLAUDE_PROJECT_DIR:-$PWD}" in
-  *volve-ai*) ;;
-  *) exit 0 ;;
-esac
+# Only sync when the active Claude session is inside a volve-ai project,
+# OR when the launchd timer explicitly forces it. The timer has no PWD /
+# CLAUDE_PROJECT_DIR context so it sets VOLVE_MEMORY_SYNC_FORCE=1.
+if [[ "${VOLVE_MEMORY_SYNC_FORCE:-0}" != "1" ]]; then
+  case "${CLAUDE_PROJECT_DIR:-$PWD}" in
+    *volve-ai*) ;;
+    *) exit 0 ;;
+  esac
+fi
 
 case "$(uname -s)" in
   Darwin)

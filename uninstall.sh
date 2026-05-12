@@ -103,6 +103,11 @@ if [[ "$(uname -s)" == "Darwin" ]]; then
   cat <<'EOF'
     ~/.tmux/plugins/        # tmux plugin manager + plugins (from bootstrap.sh + just update)
     ~/.claude/plugins/      # Claude Code marketplace (from `just claude-plugins-install`)
+    ~/Library/LaunchAgents/com.volve.*.plist
+                            # launchd jobs materialised by install.sh (real files,
+                            # not symlinks → not in manifest). To fully decommission:
+                            #   launchctl bootout gui/$(id -u)/com.volve.memory-sync
+                            #   rm ~/Library/LaunchAgents/com.volve.memory-sync.plist
     ~/Library/pnpm/         # pnpm runtime + global packages
     Global pnpm packages: pnpm rm -g @anthropic-ai/claude-code @mariozechner/pi-coding-agent pyright typescript
     Brewfile packages:    brew bundle --file=machine/mac/Brewfile cleanup --force

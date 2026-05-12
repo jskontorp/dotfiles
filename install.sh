@@ -135,6 +135,19 @@ _link "$DOTFILES/claude/statusline.sh" ~/.claude/statusline.sh
 # a new script is a one-line settings.json change (no install.sh edit needed).
 [[ -d "$DOTFILES/claude/hooks" ]] && _linkd "$DOTFILES/claude/hooks" ~/.claude/hooks
 
+# Mac-only: materialise launchd plists with $HOME substituted to an absolute
+# path (launchd doesn't expand env vars inside ProgramArguments / log paths).
+# Real file, not a symlink — keeps the dotfiles-tracked source path-agnostic.
+# Bootstrap is one-time and manual (see plist header comment); install.sh
+# only refreshes the file, leaving load/unload to the user.
+if [[ "$MACHINE" == "mac" && -d "$DOTFILES/machine/mac/launchd" ]]; then
+  mkdir -p ~/Library/LaunchAgents
+  for plist in "$DOTFILES/machine/mac/launchd"/*.plist; do
+    [[ ! -f "$plist" ]] && continue
+    sed "s|\$HOME|$HOME|g" "$plist" > ~/Library/LaunchAgents/"$(basename "$plist")"
+  done
+fi
+
 for skill in "$DOTFILES/pi/agent/skills"/*/; do
   [[ ! -d "$skill" ]] && continue
   name="$(basename "$skill")"
