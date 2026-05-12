@@ -268,8 +268,30 @@ status:
 
 # --- Management ---
 
-# Symlink all configs
+# Symlink all configs.
+#
+# Refuses to run from a worktree (any cwd whose canonical-repo-dir differs
+# from {{DOTFILES}}). Re-pointing every `~` symlink at a worktree path produces
+# dangling symlinks the moment that worktree is removed (`git worktree remove`),
+# and per pi/agent/AGENTS.md's worktree-default rule the canonical checkout is
+# the only valid linking source. The cascade: every recipe that auto-runs
+# `just link` (new-skill / edit-skill / add-skill / update-skill, JSK-37)
+# inherits this refusal — skill-mutation must happen from canonical. The fix
+# is a one-liner: `cd ~/code/personal/dotfiles && just <recipe>`.
 link:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    canonical="$(dirname "$(git -C {{DOTFILES}} rev-parse --path-format=absolute --git-common-dir)")"
+    cwd_canonical="$(dirname "$(git -C "$PWD" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || echo /dev/null/.git)")"
+    if [[ "$canonical" != "$cwd_canonical" || "{{DOTFILES}}" != "$canonical" ]]; then
+      printf "❌ just link: refusing to run from a worktree (or outside canonical).\n" >&2
+      printf "   canonical = %s\n" "$canonical" >&2
+      printf "   cwd repo  = %s\n" "$cwd_canonical" >&2
+      printf "   DOTFILES  = %s\n" "{{DOTFILES}}" >&2
+      printf "   Per pi/agent/AGENTS.md worktree-default rule, install.sh must run from canonical.\n" >&2
+      printf "   Switch: cd \"$canonical\" && just <recipe>\n" >&2
+      exit 1
+    fi
     {{DOTFILES}}/install.sh
 
 # Reverse install.sh: remove every symlink recorded in .install-manifest.
@@ -640,11 +662,12 @@ new-skill name:
     TODO
     EOF
     echo "created $dir/SKILL.md"
-    echo "next: fill in the description, then run \`just link\`"
-    ${EDITOR:-nvim} "$dir/SKILL.md"
+    echo "next: fill in the description (link runs automatically on exit)"
+    ${EDITOR:-nvim} "$dir/SKILL.md" || true
+    just link
 
 # Add a marketplace skill to pi/skill-lock.json. Fetches HEAD SHA (unless --rev),
-# appends entry, runs `just link` (via install.sh). Use --dry-run to preview.
+# appends entry, runs `just link`. Use --dry-run to preview.
 # Usage: just add-skill <url> <name> [subpath] [scope] [rev] [dry-run]
 # Positional args:
 #   url         upstream GitHub URL
@@ -714,11 +737,10 @@ add-skill url name subpath="" scope="global" rev="" dry_run="":
     print(f"added '{name}' to {lock_path}")
     PYEOF
     if [[ "$dry_run" == "dry-run" ]]; then
-      echo "(dry-run: skipping install.sh)"
+      echo "(dry-run: skipping just link)"
       exit 0
     fi
-    echo "running install.sh ..."
-    {{DOTFILES}}/install.sh
+    just link
 
 # Bump a marketplace skill's pinned SHA to upstream HEAD, then re-install.
 # Usage: just update-skill <name>
@@ -752,8 +774,7 @@ update-skill name:
     PYEOF
     # Clear cache so install.sh re-fetches at the new rev
     rm -rf "$HOME/.local/share/pi-skills/$name"
-    echo "running install.sh ..."
-    {{DOTFILES}}/install.sh
+    just link
 
 # Open an existing pi skill's SKILL.md in $EDITOR, regardless of cwd
 [group('edit')]
@@ -766,12 +787,16 @@ edit-skill name:
     global="{{DOTFILES}}/pi/agent/skills/$name/SKILL.md"
     lock="{{DOTFILES}}/pi/skill-lock.json"
     if [[ -f "$global" ]]; then
-      exec $editor "$global"
+      $editor "$global" || true
+      just link
+      exit 0
     fi
     proj=()
     while IFS= read -r line; do proj+=("$line"); done < <(find "{{DOTFILES}}/projects" -mindepth 4 -maxdepth 4 -path "*/skills/$name/SKILL.md" 2>/dev/null)
     if [[ ${#proj[@]} -eq 1 ]]; then
-      exec $editor "${proj[0]}"
+      $editor "${proj[0]}" || true
+      just link
+      exit 0
     elif [[ ${#proj[@]} -gt 1 ]]; then
       echo "error: skill '$name' exists in multiple projects:" >&2
       printf '  %s\n' "${proj[@]}" >&2

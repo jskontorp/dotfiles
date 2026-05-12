@@ -112,7 +112,7 @@ This file lives at `~/code/personal/dotfiles/pi/agent/AGENTS.md` (pi reads it vi
 - Global extension → `dotfiles/pi/agent/extensions/<name>.ts`
 - Inventory overview: `just skills`.
 
-Run `just link` after mutating changes. Skill management commands (all work regardless of cwd):
+Skill management commands (all work regardless of cwd; each runs `just link` on completion):
 - `just skills` — unified inventory table.
 - `just new-skill <name>` — scaffold a custom global skill (authored locally, tracked in dotfiles).
 - `just edit-skill <name>` — open an existing skill in `$EDITOR`.
