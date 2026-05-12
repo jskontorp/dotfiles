@@ -1,3 +1,17 @@
+# GRAVEYARD — moved 2026-05-12.
+# Reason: legacy worktree helpers superseded by plain `git worktree` in agent workflows.
+# Mine for inspiration before any rewrite; do not source.
+#
+# Design notes worth preserving:
+# - Sibling-dir convention: `<repo>_worktrees/<name>` (now-orphaned — nothing else uses it).
+# - Idempotent project setup: lockfile detection (pnpm/uv) + `.env*` symlinking + install if missing.
+# - Removal with dirty-state warning + tmux window cleanup (gwtr).
+# - `gwtra` (remove all) is dangerous; reconsider whether a replacement should ship it.
+# - `read -q` is zsh-specific; bash-portable replacement needs a guard.
+# - Branch-already-exists path with confirmation prompt is good UX.
+#
+# Original docs follow.
+
 # Git worktree management with tmux integration
 #
 # Worktrees are created in a sibling directory: <repo>_worktrees/<name>

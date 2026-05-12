@@ -1,3 +1,13 @@
+# GRAVEYARD — moved 2026-05-12.
+# Reason: sv ticket-session manager retired (see graveyard/sv-proxy.zsh).
+# Mine for inspiration before any rewrite; do not source.
+#
+# Design notes worth preserving:
+# - Resolves repo root by mirroring sv_resolve_repo from the VM-side sv script.
+# - Three completion sources: tmux session windows, worktree dirs, branch list.
+#
+# Original docs follow.
+
 # Tab completion for the sv command (~/.local/bin/sv)
 
 _sv() {

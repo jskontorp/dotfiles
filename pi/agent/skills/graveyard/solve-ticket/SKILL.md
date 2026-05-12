@@ -1,3 +1,18 @@
+<!--
+GRAVEYARD — moved 2026-05-12.
+Reason: ticket-implementation skill retired alongside sv (the launcher) and gwt (the worktree helper).
+Nothing in install.sh references this dir; the skills loop skips `graveyard/`.
+Mine for inspiration before any rewrite; do not invoke.
+
+Design notes worth preserving:
+- Phase structure: understand → plan → worktree → implement → verify → peer-review → user-review → deliver.
+- `peer-review-spawn.sh`: 2-round per-session cap enforced via $STATE_DIR/$TICKET-review-N.md count + noclobber slot reservation; spawns reviewer under timeout/gtimeout (hard-fails if neither installed — otherwise the cap isn't real).
+- Cross-agent state convention: $STATE_DIR_NAME (.pi-state for pi, .claude-state for Claude) under <repo>_worktrees/.
+- Cross-agent reviewer convention: REVIEW_CMD (default "pi -p --no-session --no-skills", Claude overrides to "claude -p") + REVIEW_TICKET_INSTR (pi linear syntax vs Claude MCP tool name) — same scripts, different agent.
+- dev-server polling for "Ready in" log line (30s timeout) before declaring readiness.
+- gh CLI driven PR creation with "Closes <TICKET>" body for Linear auto-link.
+-->
+
 ---
 name: solve-ticket
 description: >-

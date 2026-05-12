@@ -1,3 +1,15 @@
+# GRAVEYARD — moved 2026-05-12.
+# Reason: sv ticket-session manager retired; pi/Claude agents drive worktree workflows directly now.
+# Mine for inspiration before any rewrite; do not source.
+#
+# Design notes worth preserving:
+# - SSH proxy with stdin-pipe and SSH ControlMaster tunnels for low-latency reattach.
+# - Per-ticket cached state under ~/.cache/sv-tickets and ~/.cache/sv-tunnels.
+# - `_sv_ticket_port` mod-1000 collision-tolerant port allocation; mirrored in VM-side `ticket_port`.
+# - Single tmux session named `sv` with one window per ticket.
+#
+# Original docs follow.
+
 # sv — Remote wrapper for VM-based pi agent sessions (v3)
 #
 # All sessions and worktrees live on the VM. This proxies to

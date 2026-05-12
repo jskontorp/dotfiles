@@ -79,8 +79,15 @@ _link "$DOTFILES/pi/agent/models.json"   ~/.pi/agent/models.json
 mkdir -p ~/.pi/agent/skills
 for skill in "$DOTFILES/pi/agent/skills"/*/; do
   [[ ! -d "$skill" ]] && continue
+  [[ "$(basename "$skill")" == "graveyard" ]] && continue
   _linkd "$skill" ~/.pi/agent/skills/"$(basename "$skill")"
 done
+
+# Cleanup: skills graveyarded 2026-05-12. The skills loop skips graveyard/
+# but doesn't remove orphan symlinks left by prior installs (per the
+# "Skill scope migration leaves orphan symlinks" regression class in AGENTS.md).
+rm -f ~/.pi/agent/skills/solve-ticket
+rm -f ~/.claude/skills/solve-ticket  # was claude-compatible: false, so likely never existed; safe no-op
 
 # pi extensions: symlink each .ts file into ~/.pi/agent/extensions/.
 # Skip .d.ts (type-declaration only — no runtime export, pi rejects them
@@ -151,6 +158,7 @@ fi
 for skill in "$DOTFILES/pi/agent/skills"/*/; do
   [[ ! -d "$skill" ]] && continue
   name="$(basename "$skill")"
+  [[ "$name" == "graveyard" ]] && continue
   if _claude_skill_excluded "$skill"; then
     # Sweep prior mirror if the skill was previously claude-compatible. The
     # broken-symlink prune above only catches dangling links; reverting a
@@ -401,18 +409,19 @@ find ~/.config/zsh -maxdepth 1 -type l ! -exec test -e {} \; -delete 2>/dev/null
 _link "$DOTFILES/zsh/core.zsh"          ~/.config/zsh/
 _link "$DOTFILES/zsh/git-aliases.zsh"   ~/.config/zsh/
 _link "$DOTFILES/zsh/git-helpers.zsh"   ~/.config/zsh/
-_link "$DOTFILES/zsh/git-worktrees.zsh" ~/.config/zsh/
 _link "$DOTFILES/zsh/pi-notion-routing.zsh" ~/.config/zsh/
 
-# Clean up renamed files from previous installs
-rm -f ~/.config/zsh/sv.zsh  # renamed to sv-completion.zsh
+# Clean up files from previous installs (rename + graveyard removals).
+# uninstall.sh is manifest-driven and would also handle these, but `just link`
+# (re-install) doesn't run uninstall first — orphan symlinks would survive.
+rm -f ~/.config/zsh/sv.zsh             # renamed (long ago) to sv-completion.zsh
+rm -f ~/.config/zsh/git-worktrees.zsh  # graveyarded 2026-05-12
+rm -f ~/.config/zsh/sv-proxy.zsh       # graveyarded 2026-05-12
+rm -f ~/.config/zsh/sv-completion.zsh  # graveyarded 2026-05-12
 
 # Machine-specific zsh helpers
 if [[ "$MACHINE" == "mac" ]]; then
-  _link "$DOTFILES/zsh/sv-proxy.zsh"   ~/.config/zsh/
   _link "$DOTFILES/zsh/ssh-theme.zsh"  ~/.config/zsh/
-else
-  _link "$DOTFILES/zsh/sv-completion.zsh" ~/.config/zsh/
 fi
 
 # --- Mac-only ---
@@ -427,8 +436,7 @@ fi
 
 # --- VM-only ---
 if [[ "$MACHINE" == "vm" ]]; then
-  mkdir -p ~/.local/bin
-  _link "$M/bin/sv" ~/.local/bin/sv
+  rm -f ~/.local/bin/sv  # graveyarded 2026-05-12
 fi
 
 # --- Project-specific pi config ---

@@ -1,3 +1,9 @@
+<!--
+GRAVEYARD — moved 2026-05-12.
+Reason: sv ticket-session manager retired. See graveyard/sv (script) for design-notes header.
+Mine for inspiration before any rewrite; do not treat as current docs.
+-->
+
 # sv — Solve ticket session manager (v3)
 
 CLI that manages the full lifecycle of Linear ticket work on a VM: a single tmux session with per-ticket windows, git worktrees, and pi agent launches.

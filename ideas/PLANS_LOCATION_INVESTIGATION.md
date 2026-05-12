@@ -1,5 +1,7 @@
 # Persistent AI-plan artefact location — investigation
 
+> **Note (2026-05-12):** the `solve-ticket` skill has since been graveyarded (see `pi/agent/skills/graveyard/solve-ticket/`). References below treat it as live; preserved for the design reasoning.
+
 Scope: where should `writing-plans`-style plan markdown files live in Jørgen's dotfiles-managed Claude Code + pi setup? Is `mem0` a useful layer above? Should the upstream `obra/superpowers/writing-plans` skill be accepted as-is, forked, or skipped?
 
 ---

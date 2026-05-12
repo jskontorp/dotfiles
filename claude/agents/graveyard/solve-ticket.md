@@ -1,3 +1,10 @@
+<!--
+GRAVEYARD — moved 2026-05-12.
+Reason: Claude-side mirror of the now-graveyarded pi solve-ticket skill (see pi/agent/skills/graveyard/solve-ticket/SKILL.md).
+install.sh's claude/agents loop globs *.md at top level only, so this subdir is ignored automatically.
+Mine for inspiration before any rewrite; do not invoke.
+-->
+
 ---
 name: solve-ticket
 description: >-

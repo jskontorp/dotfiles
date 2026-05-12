@@ -1,4 +1,17 @@
 #!/usr/bin/env zsh
+# GRAVEYARD — moved 2026-05-12.
+# Reason: ticket-session manager retired; agent workflows now use plain `git worktree` directly.
+# Mine for inspiration before any rewrite; do not invoke.
+#
+# Design notes worth preserving:
+# - Single tmux `sv` session with per-ticket windows + a `home` window that's never killed.
+# - Lifecycle: --fresh / --shelve / --close — three distinct cleanup levels (window-only, branch+PR-preserving, full nuke).
+# - `ticket_port` mod-1000 port allocation with collision tolerance, mirrored in zsh/sv-proxy.zsh.
+# - Worktree mgmt via `git worktree add/remove/prune` + .env.local symlink + pnpm install.
+# - Dev server lives in a separate tmux session (`<ticket>-dev`) so it survives ticket-window churn.
+#
+# Original code follows.
+
 # sv — Session manager for pi agent ticket work (v3).
 #
 # Manages tmux windows (inside a single "sv" session) and git worktrees

@@ -66,8 +66,6 @@ run_test() {
   # --- Seed old state for migration tests ---
   printf "Seeding old state...\n"
   dexec bash -c "mkdir -p ~/.config/zsh ~/old_dotfiles/zsh"
-  dexec bash -c "echo '# old sv completion' > ~/old_dotfiles/zsh/sv.zsh"
-  dexec bash -c "ln -sf ~/old_dotfiles/zsh/sv.zsh ~/.config/zsh/sv.zsh"
   dexec bash -c "ln -sf /nonexistent/old-helper.zsh ~/.config/zsh/old-helper.zsh"
   # Pre-existing user-authored file the uninstall block asserts survives.
   # bootstrap.sh would normally create this from interactive prompts; here
@@ -91,32 +89,8 @@ run_test() {
 
   # --- Platform correctness: wrong-platform files must be absent ---
   printf "\nPlatform correctness:\n"
-  if [[ "$machine" == "mac" ]]; then
-    check "sv-completion.zsh absent"       'dexec bash -c "! test -e /home/testuser/.config/zsh/sv-completion.zsh"'
-
-    # --- sv-proxy _sv_ticket_port parity with VM ticket_port ---
-    printf "\nsv-proxy _sv_ticket_port:\n"
-    dexec zsh -c 'sed -n "/_sv_ticket_port()/,/^}/p" ~/.config/zsh/sv-proxy.zsh > /tmp/sv_ticket_port.zsh'
-    check "tech-123 → 3123"     'dexec zsh -c "source /tmp/sv_ticket_port.zsh; [[ \$(_sv_ticket_port tech-123) == 3123 ]]"'
-    check "tech-1234 → 3234"    'dexec zsh -c "source /tmp/sv_ticket_port.zsh; [[ \$(_sv_ticket_port tech-1234) == 3234 ]]"'
-    check "tech-0 → 3000"       'dexec zsh -c "source /tmp/sv_ticket_port.zsh; [[ \$(_sv_ticket_port tech-0) == 3000 ]]"'
-  fi
   if [[ "$machine" == "vm" ]]; then
-    check "sv-proxy.zsh absent"            'dexec bash -c "! test -e /home/testuser/.config/zsh/sv-proxy.zsh"'
     check "ssh-theme.zsh absent"           'dexec bash -c "! test -e /home/testuser/.config/zsh/ssh-theme.zsh"'
-
-    # --- sv ticket_port logic ---
-    # Extract just the function (can't source sv — top-level code exits outside a repo)
-    printf "\nsv ticket_port:\n"
-    dexec zsh -c 'sed -n "/^ticket_port()/,/^}/p" ~/.local/bin/sv > /tmp/ticket_port.zsh'
-    check "tech-1 → 3001"       'dexec zsh -c "source /tmp/ticket_port.zsh; [[ \$(ticket_port tech-1) == 3001 ]]"'
-    check "tech-123 → 3123"     'dexec zsh -c "source /tmp/ticket_port.zsh; [[ \$(ticket_port tech-123) == 3123 ]]"'
-    check "tech-1234 → 3234"    'dexec zsh -c "source /tmp/ticket_port.zsh; [[ \$(ticket_port tech-1234) == 3234 ]]"'
-    check "tech-8 → 3008"       'dexec zsh -c "source /tmp/ticket_port.zsh; [[ \$(ticket_port tech-8) == 3008 ]]"'
-    check "tech-0 → 3000"       'dexec zsh -c "source /tmp/ticket_port.zsh; [[ \$(ticket_port tech-0) == 3000 ]]"'
-    check "tech-0000 → 3000"    'dexec zsh -c "source /tmp/ticket_port.zsh; [[ \$(ticket_port tech-0000) == 3000 ]]"'
-    check "tech-2123 → 3123 (collision with tech-123)" \
-                                'dexec zsh -c "source /tmp/ticket_port.zsh; [[ \$(ticket_port tech-2123) == 3123 ]]"'
   fi
 
   # --- Config syntax validation ---
@@ -151,14 +125,11 @@ run_test() {
 
   # --- Migration cleanup ---
   printf "\nMigration:\n"
-  check "orphan sv.zsh removed"            'dexec bash -c "! test -e /home/testuser/.config/zsh/sv.zsh"'
   check "stale broken symlink removed"     'dexec bash -c "! test -L /home/testuser/.config/zsh/old-helper.zsh"'
 
   # --- Skill content spot checks ---
   printf "\nSkill content:\n"
   check "delegate has scripts/"            'dexec test -d /home/testuser/.pi/agent/skills/delegate/scripts'
-  check "solve-ticket has no skill-loading table" \
-    'dexec bash -c "! grep -q \"Load skills when\" ~/.pi/agent/skills/solve-ticket/SKILL.md"'
   check "AGENTS.md contains NAJA"          'dexec grep -q NAJA /home/testuser/.pi/agent/AGENTS.md'
   check "at least 5 skill symlinks"        'dexec bash -c "[[ \$(find ~/.pi/agent/skills -maxdepth 1 -type l | wc -l) -ge 5 ]]"'
   check "settings.json lists pi-linear-tools package" \
@@ -195,23 +166,10 @@ run_test() {
   done
 
   # --- Claude Code agents (~/.claude/agents/) ---
-  # Scoped to Claude-authored subagents only — pi skills legitimately use
-  # Bash(pi:*) / linear tool names, so global grep would false-positive.
-  printf "\nClaude Code agents:\n"
-  check "\$HOME/.claude/agents/solve-ticket.md is a live symlink" \
-    'dexec bash -c "[[ -L /home/testuser/.claude/agents/solve-ticket.md && -e /home/testuser/.claude/agents/solve-ticket.md ]]"'
-  check "solve-ticket agent has no Bash(pi:*) refs" \
-    'dexec bash -c "! grep -q \"Bash(pi:\\*)\" /home/testuser/.claude/agents/solve-ticket.md"'
-  check "solve-ticket agent has no \"pi -p\" invocations" \
-    'dexec bash -c "! grep -Eq \"\\\\bpi -p\\\\b\" /home/testuser/.claude/agents/solve-ticket.md"'
-  check "solve-ticket agent has no claude-compatible frontmatter (wrong schema)" \
-    'dexec bash -c "! grep -q \"^claude-compatible:\" /home/testuser/.claude/agents/solve-ticket.md"'
-  check "solve-ticket agent has no allowed-tools frontmatter (wrong schema)" \
-    'dexec bash -c "! grep -q \"^allowed-tools:\" /home/testuser/.claude/agents/solve-ticket.md"'
-  check "solve-ticket agent tools: is single-line CSV" \
-    'dexec bash -c "[[ \$(grep -c \"^tools:\" /home/testuser/.claude/agents/solve-ticket.md) -eq 1 ]]"'
-  check "solve-ticket referenced scripts exist" \
-    'dexec bash -c "test -x /home/testuser/dotfiles/pi/agent/skills/solve-ticket/scripts/workspace-setup.sh && test -x /home/testuser/dotfiles/pi/agent/skills/solve-ticket/scripts/dev-server.sh && test -x /home/testuser/dotfiles/pi/agent/skills/solve-ticket/scripts/peer-review-spawn.sh"'
+  # Currently no Claude-authored subagents are shipped (solve-ticket was
+  # graveyarded 2026-05-12). The agents/ install loop tolerates an empty
+  # dir via its `[[ -f ]]` guard, so no assertion is needed here. Re-add
+  # per-agent integrity checks if a new subagent ships.
 
   # --- Shell behaviour ---
   printf "\nShell behaviour:\n"
@@ -225,10 +183,6 @@ run_test() {
   check "git fn: gdc"                      'dexec zsh -i -c "whence -w gdc | grep -q function"'
   check "git fn: gae"                      'dexec zsh -i -c "whence -w gae | grep -q function"'
   check "git fn: gcof"                     'dexec zsh -i -c "whence -w gcof | grep -q function"'
-  check "git fn: gwt"                      'dexec zsh -i -c "whence -w gwt | grep -q function"'
-  check "git fn: gwts"                     'dexec zsh -i -c "whence -w gwts | grep -q function"'
-  check "git fn: gwtr"                     'dexec zsh -i -c "whence -w gwtr | grep -q function"'
-  check "git fn: _gwt_root (internal)"     'dexec zsh -i -c "whence -w _gwt_root | grep -q function"'
 
   # --- Re-source safety ---
   printf "\nRe-source safety:\n"
@@ -254,7 +208,7 @@ run_test() {
   # marketplace-skills case where install.sh legitimately points symlinks
   # at ~/.local/share/pi-skills/ caches.
   dexec bash -c "rm ~/.config/zsh/git-aliases.zsh && echo 'user content' > ~/.config/zsh/git-aliases.zsh"  # state drift
-  dexec bash -c "ln -sfn /tmp/foreign-target ~/.config/zsh/git-worktrees.zsh"                              # manifest-tracked, foreign target
+  dexec bash -c "ln -sfn /tmp/foreign-target ~/.config/zsh/git-helpers.zsh"                                # manifest-tracked, foreign target
   dexec bash -c "cd ~/dotfiles && ./uninstall.sh" >/dev/null
 
   check "manifest deleted"                 'dexec bash -c "! test -e ~/dotfiles/.install-manifest"'
@@ -263,7 +217,7 @@ run_test() {
   check "in-repo pre-commit symlink gone"  'dexec bash -c "! test -L ~/dotfiles/.git/hooks/pre-commit"'
   check "state-drift file preserved"       'dexec bash -c "[[ \$(cat ~/.config/zsh/git-aliases.zsh) == \"user content\" ]]"'
   check "manifest-tracked foreign-target symlink removed" \
-    'dexec bash -c "! test -L ~/.config/zsh/git-worktrees.zsh"'
+    'dexec bash -c "! test -L ~/.config/zsh/git-helpers.zsh"'
   check "marketplace-skill symlinks removed (target outside \$DOTFILES)" \
     'dexec bash -c "! test -L ~/.pi/agent/skills/typescript-advanced-types"'
   check "gitconfig.local survives uninstall" 'dexec bash -c "grep -q test@example.com ~/.gitconfig.local"'

@@ -1,5 +1,7 @@
 # Claude Code Wishlist for Pi
 
+> **Note (2026-05-12):** the `solve-ticket` skill has since been graveyarded (see `pi/agent/skills/graveyard/solve-ticket/`). References below treat it as live; preserved for the design reasoning.
+
 What Claude Code does that pi should learn from — organized by effort,
 all high impact. Based on deep reading of Claude Code source (`~/Downloads/src`),
 snainm competition post-mortems, and pi session failure analysis.
