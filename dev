@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+# dev — Worktree + tmux launcher for parallel agent work in dotfiles.
+#
+# Usage: ./dev <slug>
+#
+# Creates ~/code/personal/dotfiles_worktrees/<slug> on a new branch from main,
+# opens a tmux window <slug> in the `dotfiles` session, hands you a shell.
+# Idempotent: re-running with the same slug selects the existing window.
+#
+# Constraints (deliberate, do not relax without re-reading AGENTS.md):
+# - Run from canonical dotfiles only. Refuses elsewhere.
+# - Slug must match [a-z0-9][a-z0-9-]* (lowercase, hyphens, no slashes/spaces).
+# - Does NOT run install.sh, just link, pnpm install, or anything touching ~.
+# - Does NOT lifecycle worktrees (no --remove, --shelve, --close, --list).
+#   `git worktree remove` is the cleanup; this script does not garbage-collect.
+# - Does NOT auto-launch pi/claude. Hands you a shell; you decide.
+#
+# This is the boring version on purpose. Two iterations of fancier helpers
+# (zsh/graveyard/git-worktrees.zsh, machine/vm/bin/graveyard/sv) are in the
+# graveyard; mine those for design notes before adding any feature here.
+
+set -euo pipefail
+
+# Hard-fail on missing tools we depend on later (per AGENTS.md regression
+# class: "`set -e` + missing optional tool" — cfc4ba1, 070d150).
+for tool in tmux git; do
+  command -v "$tool" >/dev/null 2>&1 || { echo "❌ required tool not on PATH: $tool" >&2; exit 66; }
+done
+
+# Resolve canonical via pwd -P so a symlinked ~/code (e.g. external volume)
+# doesn't false-reject the cwd check below.
+CANONICAL="$(cd "$HOME/code/personal/dotfiles" 2>/dev/null && pwd -P)" || {
+  echo "❌ canonical dotfiles not found at \$HOME/code/personal/dotfiles" >&2
+  exit 67
+}
+SESSION="dotfiles"
+WT_BASE="$HOME/code/personal/dotfiles_worktrees"
+
+usage() {
+  cat >&2 <<EOF
+usage: ./dev <slug>
+  slug: [a-z0-9][a-z0-9-]* (lowercase, hyphens; no slashes, no spaces)
+EOF
+  exit 64
+}
+
+[[ $# -eq 1 ]] || usage
+SLUG="$1"
+
+# Validate slug shape.
+[[ "$SLUG" =~ ^[a-z0-9][a-z0-9-]*$ ]] || {
+  echo "❌ slug must match [a-z0-9][a-z0-9-]* — got: '$SLUG'" >&2
+  exit 64
+}
+
+# Refuse outside canonical. Resolve via pwd -P (matches install.sh:8 style;
+# avoids realpath portability issues per AGENTS.md regression classes).
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+[[ "$SCRIPT_DIR" == "$CANONICAL" ]] || {
+  echo "❌ ./dev must be run from canonical dotfiles ($CANONICAL)" >&2
+  echo "   got: $SCRIPT_DIR" >&2
+  exit 65
+}
+
+WT="$WT_BASE/$SLUG"
+
+# Worktree: create or reuse. Three cases:
+#  - dir exists       → reuse (report current branch)
+#  - dir missing, branch exists  → attach worktree to existing branch
+#                                  (happens after `git worktree remove` left
+#                                   the branch behind)
+#  - dir missing, branch missing → fresh worktree + new branch from main
+if [[ -d "$WT" ]]; then
+  existing_branch="$(git -C "$WT" branch --show-current 2>/dev/null || echo '?')"
+  echo "ℹ worktree exists: $WT (branch: $existing_branch)"
+elif git -C "$CANONICAL" show-ref --verify --quiet "refs/heads/$SLUG"; then
+  echo "→ attaching worktree: $WT to existing branch '$SLUG'"
+  git -C "$CANONICAL" worktree add "$WT" "$SLUG"
+else
+  main_sha="$(git -C "$CANONICAL" rev-parse --short main)"
+  echo "→ creating worktree: $WT (new branch '$SLUG' from main @ $main_sha)"
+  echo "  (if main is stale: \`cd $CANONICAL && git fetch && git rebase origin/main\`, then re-run)"
+  git -C "$CANONICAL" worktree add "$WT" -b "$SLUG" main
+fi
+
+# Tmux: probe-and-extend (never kill-session — see AGENTS.md regression class
+# on shared tmux infra). Three cases: no session, session-with-window,
+# session-without-window.
+if ! tmux has-session -t "$SESSION" 2>/dev/null; then
+  echo "→ creating tmux session '$SESSION' with window '$SLUG'"
+  tmux new-session -d -s "$SESSION" -n "$SLUG" -c "$WT"
+elif tmux list-windows -t "$SESSION" -F '#W' 2>/dev/null | grep -qx "$SLUG"; then
+  echo "ℹ tmux window exists: $SESSION:$SLUG (selecting)"
+  tmux select-window -t "$SESSION:$SLUG"
+else
+  echo "→ creating tmux window: $SESSION:$SLUG"
+  tmux new-window -t "$SESSION" -n "$SLUG" -c "$WT"
+  tmux select-window -t "$SESSION:$SLUG"
+fi
+
+cat <<EOF
+✅ ready: $WT
+   peek: tmux attach -t $SESSION \\; select-window -t $SESSION:$SLUG
+   cleanup (after merge): git worktree remove "$WT"
+EOF

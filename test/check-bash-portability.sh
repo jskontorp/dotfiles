@@ -33,6 +33,7 @@ while IFS= read -r -d '' f; do files+=("$f"); done < <(
     [[ -f "$REPO_DIR/init.sh" ]] && printf '%s\0' "$REPO_DIR/init.sh"
     [[ -f "$REPO_DIR/install.sh" ]] && printf '%s\0' "$REPO_DIR/install.sh"
     [[ -f "$REPO_DIR/uninstall.sh" ]] && printf '%s\0' "$REPO_DIR/uninstall.sh"
+    [[ -f "$REPO_DIR/dev" ]] && printf '%s\0' "$REPO_DIR/dev"
     find "$REPO_DIR/test" -maxdepth 1 -type f -name '*.sh' -print0 2>/dev/null
     find "$REPO_DIR/machine" -type f -name 'bootstrap.sh' -print0 2>/dev/null
     find "$REPO_DIR/git/hooks" -type f -print0 2>/dev/null

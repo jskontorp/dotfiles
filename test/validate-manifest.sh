@@ -11,7 +11,30 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+CALLER_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# install.sh runs in the canonical (main) checkout and writes the manifest +
+# ~/.claude/CLAUDE.md @-import there. When this script runs from a worktree,
+# CALLER_DIR is the worktree; resolve canonical via git's common gitdir so
+# every manifest/CLAUDE.md check below points at canonical regardless of
+# which checkout invoked us.
+#
+# `--path-format=absolute` requires git ≥ 2.31. We separate "git failed
+# (probably too old)" from "caller isn't in a git repo at all" so the silent
+# fallback to CALLER_DIR doesn't mask a worktree-blind misresolve. The
+# probe runs once with the new flag; if it fails *and* CALLER_DIR is a git
+# checkout, we hard-fail with a clear version error rather than silently
+# returning the wrong manifest path. Same regression class as the worktree-
+# blind one this file documents.
+if COMMON_GIT_DIR="$(git -C "$CALLER_DIR" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"; then
+  REPO_DIR="$(dirname "$COMMON_GIT_DIR")"
+elif git -C "$CALLER_DIR" rev-parse --git-dir >/dev/null 2>&1; then
+  printf "  ❌ git ≥ 2.31 required for --path-format=absolute (got: %s)\n" "$(git --version 2>&1)" >&2
+  exit 1
+else
+  REPO_DIR="$CALLER_DIR"
+fi
+
 MANIFEST="$REPO_DIR/.install-manifest"
 
 if [[ ! -f "$MANIFEST" ]]; then

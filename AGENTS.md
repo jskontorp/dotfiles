@@ -13,8 +13,36 @@ Repo-local addendum for agents working on this dotfiles repo. The global cross-a
 | `pi/skill-lock.json` | `just link && just skills` | `just test` | Add new entries via `just add-skill <url> <name> [subpath] [scope]`. Refresh from upstream via `just update-skill <name>`. Hand-edit only for emergencies. |
 | `claude/CLAUDE.md`, `claude/agents/*.md`, `claude/settings.json` | `just link` | `just test` | When widening `claude/settings.json` permissions, document the rationale inline in the JSON. |
 | `zsh/*.zsh` | `just check` (bash-portability scan) | `just test` | Sourced by every interactive shell on bootstrap; the Docker suite's "zshrc sources cleanly" / re-source-safety checks are the only end-to-end coverage. PATH / env-export logic isn't asserted explicitly — eyeball it. |
+| `dev`, `test/validate-manifest.sh` | `just check` (from canonical AND from a worktree) | `just test` | Both must work cross-checkout: `dev` runs only from canonical; `validate-manifest.sh` resolves canonical via `git rev-parse --git-common-dir` and is exercised from both sides. New regression-class entry below covers the worktree-blind `$REPO_DIR` failure mode. |
 
 `just check` runs the host-side suite (justfile parity, manifest integrity, bash portability) and is wired into `git/hooks/pre-commit`. `just test` runs the full Docker integration suite (~minutes) and requires a Docker runtime on `PATH` — OrbStack is installed by default via `machine/mac/Brewfile` (it also provides the `ssh orb` host); Docker Desktop is the heavier alternative. `verify.sh` prints the install hint if `docker` is missing.
+
+## Worktree default
+
+This repo is shared across multiple agent + human sessions concurrently. Editing in canonical produces collisions (dirty trees, branch races, lost work). **Default: edit in a worktree.**
+
+**Spawn one** (from canonical, `~/code/personal/dotfiles`):
+
+```bash
+./dev <slug>
+```
+
+Creates `~/code/personal/dotfiles_worktrees/<slug>` on branch `<slug>` from `main`, opens a `<slug>` window in the `dotfiles` tmux session. The window is created in a possibly-detached session; `./dev` does not auto-attach. Re-running selects the existing window. Slug rules: `[a-z0-9][a-z0-9-]*`, lowercase, hyphens, no slashes/spaces.
+
+Last-resort fallback when `./dev` is unavailable (prefer the script):
+
+```bash
+git worktree add ~/code/personal/dotfiles_worktrees/<slug> -b <slug> main
+cd ~/code/personal/dotfiles_worktrees/<slug>
+```
+
+**Inline-edit exception.** An edit stays in canonical only if **both** apply: (a) every file it touches has no row in the Trigger matrix above, **and** (b) the total of added + removed lines, summed across all touched files, is ≤ 5. Anything that fails either condition → worktree, no negotiation. The trigger matrix is the single source of truth for the high-risk path list; do not maintain a parallel list here.
+
+**Hard rules from a worktree.**
+
+- **Never `./install.sh` or `just link`.** They re-point every symlink in `~` at the worktree path; `git worktree remove` later → dangling symlinks under `~/.config/zsh/`, `~/.pi/agent/skills/`, etc. Worktree-side verification is `just check` (host-side, no symlink mutation) and `just test` (Docker, hermetic).
+- **Pre-commit hook fires from worktrees automatically.** Git falls back to canonical's `.git/hooks/` when the per-worktree `.git/worktrees/<name>/hooks/` dir is empty (the default). So `just check` runs as part of `git commit` whether you're in canonical or a worktree — no manual pre-commit step needed.
+- **Cleanup is manual.** After PR merge, from canonical: `git worktree remove ~/code/personal/dotfiles_worktrees/<slug>`, then `just link` if the trigger matrix says to.
 
 ## Workflow rules
 
@@ -30,6 +58,9 @@ Repo-local addendum for agents working on this dotfiles repo. The global cross-a
 - **Project decommission leaves orphan symlinks.** Removing a project from `projects.conf` / deleting `projects/<name>/` strands every symlink `install.sh` previously created under that project's working tree (and any `~/.pi/agent/extensions/<x>` / `<x>.ts` left from a global → project move — see 0f38b0c, file moves into `extensions/graveyard/`). `install.sh` only links forward; `uninstall.sh` is manifest-driven and these never entered the manifest. `validate-manifest.sh` now buckets them as `ORPHAN` (target missing) distinct from `UNTRACKED` (target exists, real install.sh bug). Remediation: `rm` the symlinks. Evidence: 6afb180, 0f38b0c.
 - **Skill-script portability is on the author.** `test/check-bash-portability.sh:14` excludes `pi/agent/skills/**/scripts/` and `SKILL.md` shell examples; BSD `sed`/`grep` and bash-3.2 are not enforced. Evidence: be2f69e.
 - **Skills sharing infra must probe-and-extend, not clobber.** The `pi-delegate` tmux session and `.pi-delegate/` paths are shared across the `delegate` and `triple-review` skills (and any future skill that reuses them). Use `tmux has-session` + `batch-N` increment, never `kill-session`. The same applies to filesystem state inside `.pi-delegate/`: skills sharing the dir must allocate `batch-N/` subdirs via atomic `mkdir` (no `-p`) with retry-on-collision, and must keep the FS probe **independent** of the tmux probe — the two namespaces have different lifetimes (tmux session is per-machine, `.pi-delegate/` is per-cwd) and coupling them produces duplicate tmux window names cross-cwd. Evidence: 0d891ab, be2f69e (per-batch FS allocation: TBD post-commit).
+- **Test/check scripts that derive `$REPO_DIR` from their own location are worktree-blind.** Anything install.sh wrote (the manifest, the `~/.claude/CLAUDE.md` `@-import` line, hook symlinks) lives in canonical — not in the worktree the script runs from. Resolve canonical via `git -C "$CALLER_DIR" rev-parse --path-format=absolute --git-common-dir` then `dirname` (works from canonical and from any worktree; needs git ≥ 2.31). Anything that genuinely cares about the *caller's* checkout (file scans, lint, tsc) keeps using `$CALLER_DIR`. Evidence: `test/validate-manifest.sh` post the worktree-default rule, broke as soon as the rule's prescribed `just check` ran from a worktree.
+- **Global `core.hooksPath` defeats the worktree hook-fallback.** The Worktree-default section above relies on git falling back to canonical's `.git/hooks/` when `.git/worktrees/<name>/hooks/` is empty. A globally-configured `core.hooksPath` (set by tools like `husky`, `lefthook`, the `pre-commit` framework, or some `lazygit` setups) bypasses both and silently disables `just check` at commit time from worktrees. Detection: `git -C <worktree> config --get core.hooksPath` should be empty. Not currently asserted by any test; add an assertion to `validate-manifest.sh` if this bites in practice.
+- **Canonical-side hook scripts that source canonical-only paths break worktree commits.** The hook fires from worktrees via the canonical-fallback (good), but if the hook's source code references files that exist only in canonical — tracked-but-not-yet-merged-to-the-worktree's-base, *or* untracked in canonical's working tree (e.g. mid-development) — then `source ./git/lib/<x>.sh` resolves against `$PWD` (the worktree) and fails with "file not found". Fix: hook scripts must resolve their own dependencies via `git rev-parse --path-format=absolute --git-common-dir` then `dirname` (same trick as `validate-manifest.sh`), so `source` paths point at canonical's tree regardless of the committing checkout. Evidence: encountered when canonical's `pre-commit` hook on `jsk-36-silencing-hook` sourced an untracked `git/lib/silencing-gate.sh` during a worktree commit on `worktree-defaults`; the hook fired correctly but the source path was worktree-relative.
 
 (Bash≥4 portability — `mapfile`, `readarray`, `${var,,}` — is now caught automatically by `test/check-bash-portability.sh`.)
 
