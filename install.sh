@@ -131,6 +131,9 @@ sed "s|\$DOTFILES|$DOTFILES|g" "$DOTFILES/claude/CLAUDE.md" > ~/.claude/CLAUDE.m
 # to materialise the enabledPlugins set via `claude plugin install`.
 _link "$DOTFILES/claude/settings.json" ~/.claude/settings.json
 _link "$DOTFILES/claude/statusline.sh" ~/.claude/statusline.sh
+# Claude SessionStart / etc. hook scripts — symlink the whole dir so adding
+# a new script is a one-line settings.json change (no install.sh edit needed).
+[[ -d "$DOTFILES/claude/hooks" ]] && _linkd "$DOTFILES/claude/hooks" ~/.claude/hooks
 
 for skill in "$DOTFILES/pi/agent/skills"/*/; do
   [[ ! -d "$skill" ]] && continue

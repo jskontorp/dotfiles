@@ -92,6 +92,10 @@
           {
             "type": "command",
             "command": "$HOME/.claude/skills/session-scan/scan.sh"
+          },
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/volve-memory-sync.sh"
           }
         ]
       }
