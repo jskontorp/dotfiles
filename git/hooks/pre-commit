@@ -5,6 +5,50 @@
 set -euo pipefail
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
+# Resolve canonical (not the calling worktree) for the secret-gate library
+# so a commit from a worktree on a branch that pre-dates this lib still
+# finds it. Same idiom as git/lib/canonical-path.sh (inlined to keep the
+# hook bootstrap-free). Regression class: pi/agent/AGENTS.md
+# "Canonical-side hook scripts that source canonical-only paths".
+CANONICAL_DIR="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
+SECRET_GATE_LIB="$CANONICAL_DIR/git/lib/secret-gate.sh"
+
+# --- secret-path gate (JSK-35) ---
+# Refuse staged paths that look like secrets (.env*, *.pem, id_*, …).
+# Pattern set lives in git/lib/secret-gate.sh; same set is mirrored in
+# pi/agent/extensions/secret-read-gate.ts and claude/settings.json.
+# This is a curated subset (not gitleaks parity) tuned for near-zero false
+# positives — see the file header in secret-gate.sh for the rationale.
+# Override: SKIP_SECRET_GATE=1 git commit ... (env var; honoured by
+# secret_gate_scan_staged). `git commit --no-verify` also bypasses, but
+# is itself gated by pi/agent/extensions/destructive-gate.ts.
+if [[ ! -f "$SECRET_GATE_LIB" ]]; then
+  # Warn-and-skip rather than hard-fail: a worktree on a branch that pre-dates
+  # this lib should still be able to commit. The gate is best-effort; if the
+  # lib is missing on canonical itself, that's an install problem to surface
+  # via `just check`, not by breaking every commit.
+  printf "⚠ secret-path gate: pattern library missing at %s — skipping check.\n" "$SECRET_GATE_LIB" >&2
+  printf "  Run 'just link' from canonical to repair, or set SKIP_SECRET_GATE=1 to silence.\n" >&2
+else
+  # shellcheck source=../lib/secret-gate.sh
+  . "$SECRET_GATE_LIB"
+  # `secret_gate_scan_staged` returns 1 when no hits, 0 when hits found; the
+  # ${#hits[@]} check below is the decision point, so swallow the function's
+  # exit code (we explicitly want the listing not the rc).
+  hits=()
+  while IFS= read -r path; do
+    [[ -n "$path" ]] && hits+=("$path")
+  done < <(secret_gate_scan_staged || true)
+  if [[ ${#hits[@]} -gt 0 ]]; then
+    printf "❌ secret-path gate: staged file(s) match the secret pattern set:\n" >&2
+    printf "   %s\n" "${hits[@]}" >&2
+    printf "\nRemediation:\n" >&2
+    printf "  • If committed by accident: git rm --cached <path> && add to .gitignore\n" >&2
+    printf "  • If genuinely intended (rare): SKIP_SECRET_GATE=1 git commit ...\n" >&2
+    printf "  • Sample/template files use .example/.sample/.template/.dist suffix\n" >&2
+    exit 1
+  fi
+fi
 
 # --- shellcheck staged shell files ---
 if command -v shellcheck &>/dev/null; then

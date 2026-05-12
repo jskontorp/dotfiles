@@ -375,6 +375,8 @@ check:
     bash {{DOTFILES}}/test/check-canonical-path.sh
     printf "\nsilencing-gate:\n"
     bash {{DOTFILES}}/test/check-silencing-gate.sh
+    printf "\nsecret-path gate (JSK-35):\n"
+    bash {{DOTFILES}}/test/check-secret-gate.sh
     printf "\ndestructive-gate patterns:\n"
     bash {{DOTFILES}}/test/check-destructive-gate.sh
     printf "\nextensions (typescript):\n"
