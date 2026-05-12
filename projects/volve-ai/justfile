@@ -1,0 +1,138 @@
+# List recipes
+default:
+    @just --list
+
+# Aliases for the hottest paths
+alias t := test
+alias c := check
+
+# --- Environment ---
+
+# Switch active env (symlinks .env -> .env.<name>). Subshell-only: does NOT
+# export vars into your current shell. To load vars into the current shell,
+# see `env-exports`.
+[doc("Switch active env (symlink .env -> .env.<name>). See env-exports to load vars into the current shell.")]
+switch env="dev":
+    ./switch_env.sh {{env}}
+
+# Shortcut: switch to dev (symlink only — see env-exports to load vars into current shell)
+switch-dev: (switch "dev")
+
+# Note: `uv run` already auto-loads .env — do NOT source one env and then `just api` another; exported vars win.
+# Refuses by default to avoid leaking secrets into terminal scrollback or agent transcripts.
+[doc("Print export statements for raw psql / ad-hoc scripts. Usage: source <(ALLOW_PRINT_SECRETS=1 just env-exports dev)")]
+env-exports env="dev":
+    @./switch_env.sh {{env}} --exports
+
+# --- Run ---
+
+# Run API server against the current .env symlink (set via `just switch <env>` first).
+# The `env=` parameter was removed intentionally: it used to silently rewrite
+# the .env symlink as a side effect, contaminating later recipe runs.
+[doc("Run API server against the current .env symlink (use `just switch <env>` first).")]
+api:
+    ./run_api.sh
+
+# Run a Cloud Run job locally (one of ~21 entrypoints under app/entrypoint/). See test_job_local.py for available job names.
+job name:
+    uv run python test_job_local.py {{name}}
+
+# --- Database ---
+
+# Note: `alembic upgrade`/`downgrade`/`stamp` are intentionally NOT exposed here — destructive,
+# require explicit per-call approval per ~/.pi/agent/AGENTS.md and CLAUDE.md.
+
+# Open psql against PG_CONN_STRING in .env.<env>. Use `. ./.env.<env>` (not `. .env.<env>`)
+# so bash sources from cwd rather than searching $PATH first.
+[doc("Open psql against PG_CONN_STRING in .env.<env>.")]
+psql env="dev":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    set -a; . ./.env.{{env}}; set +a
+    : "${PG_CONN_STRING:?PG_CONN_STRING not set in .env.{{env}}}"
+    psql "$PG_CONN_STRING"
+
+# Generate a new alembic migration scaffold (non-destructive; never edits/applies). CLAUDE.md mandates this workflow.
+db-revision message:
+    uv run alembic revision -m {{ quote(message) }}
+
+# Show current alembic revision + heads. Read-only; catches divergent-chain state locally before CI does.
+db-check:
+    uv run alembic current
+    uv run alembic heads
+
+# --- Tests ---
+
+# Run unit tests (integration excluded by [tool.pytest.ini_options] in pyproject.toml). Forwards args: just test path/to/test.py::name -v
+test *args:
+    uv run pytest {{args}}
+
+# Re-run only the tests that failed last time (fast feedback loop)
+test-failed *args:
+    uv run pytest --lf {{args}}
+
+# Run integration tests. Clears pytest config's `addopts` so our `-m integration` is the only marker filter (last `-m` wins, but being explicit avoids surprises).
+test-integration *args:
+    uv run pytest -o "addopts=" -m integration {{args}}
+
+# Coverage report (HTML in htmlcov/)
+test-cov:
+    uv run pytest --cov=app --cov-report=html
+
+# --- Quality ---
+
+# Lint with ruff
+lint:
+    uv run ruff check .
+
+# Check formatting (no writes); line-length read from pyproject.toml
+fmt-check:
+    uv run black --check app/ tests/
+
+# Format code (writes); line-length read from pyproject.toml
+fmt:
+    uv run black app/ tests/
+
+# Auto-fix ruff + format. Pairs with `check` (read-only) — `fix` is the write-mode counterpart.
+fix:
+    uv run ruff check --fix .
+    uv run black app/ tests/
+
+# Static type-check with mypy. Config lives in mypy.ini (top-level). tests/ is excluded by passing app/ as the argument.
+typecheck:
+    uv run mypy app/
+
+# Fast pre-commit gate: lint + format-check + typecheck (no tests)
+check: lint fmt-check typecheck
+
+# Pre-push gate: check + unit tests. Stricter than CI (CI runs coverage only, not lint/type); not byte-for-byte parity.
+verify: check test
+
+# --- Dependencies ---
+
+# Install deps exactly as locked (matches CI). Run after pulling main or switching branches.
+deps:
+    uv sync --all-extras --frozen
+
+# Verify uv.lock matches pyproject.toml (CI fails if not).
+deps-check:
+    uv lock --check
+
+# --- Codegen ---
+
+# Regenerate BAML client
+baml:
+    ./baml_generate.sh
+
+# --- Docker ---
+
+# Build a container image. Usage: just docker-build api  |  just docker-build job
+docker-build target="api":
+    docker build -f Dockerfile.{{target}} -t volve-ai-{{target}} .
+
+# --- Housekeeping ---
+
+# Wipe local caches (pytest, mypy, ruff, coverage). Useful when "passes locally, fails in CI".
+clean:
+    rm -rf .pytest_cache .mypy_cache .ruff_cache htmlcov coverage.xml pytest.xml
+    find . -type d -name __pycache__ -prune -exec rm -rf {} +

@@ -480,6 +480,19 @@ for pdir in "$DOTFILES/projects"/*/; do
       _linkd "$sub" "$local_pi/$sub_name"
     fi
   done
+
+  # Files at the project root (e.g. justfile) — symlink into every git
+  # worktree of the candidate repo. .path is metadata, not content. Future
+  # worktrees: re-run `just link` after `git worktree add`.
+  for f in "$pdir"*; do
+    [[ ! -f "$f" ]] && continue
+    fname="$(basename "$f")"
+    [[ "$fname" == ".path" ]] && continue
+    while IFS= read -r wt; do
+      [[ -z "$wt" ]] && continue
+      _link "$f" "$wt/$fname"
+    done < <(command git -C "$candidate" worktree list --porcelain 2>/dev/null | awk '/^worktree/ {print $2}')
+  done
 done
 
 # --- Git hooks (for the dotfiles repo itself) ---
