@@ -368,6 +368,8 @@ _link "$M/zshrc"          ~/.zshrc
 _link "$DOTFILES/shared/tmux.conf" ~/.tmux.shared.conf
 _link "$M/tmux.conf"      ~/.tmux.conf
 _link "$M/starship.toml"  ~/.config/starship.toml
+mkdir -p ~/.config/just
+_link "$DOTFILES/just/user.justfile" ~/.config/just/justfile
 
 # lazygit (different config dirs per OS)
 if [[ "$MACHINE" == "mac" ]]; then

@@ -26,6 +26,15 @@ export EDITOR="nvim"
 alias cat="bat --paging=never"
 alias lg="lazygit"
 alias jsut="just"  # fat-finger insurance
+alias gust="just --justfile ~/.config/just/justfile --working-directory ~"  # global justfile, runs in $HOME; use {{invocation_directory()}} inside recipes for cwd
+
+# `code` / `c` open in Zed instead of Cursor (which installs its own
+# `/usr/local/bin/code` shim). Shell aliases win over PATH lookups, so
+# this overrides Cursor's binary without touching the symlink.
+if [[ -x /Applications/Zed.app/Contents/MacOS/cli ]]; then
+  alias code="/Applications/Zed.app/Contents/MacOS/cli"
+  alias c="/Applications/Zed.app/Contents/MacOS/cli"
+fi
 
 # ls → eza
 alias ls="eza --color=always --group-directories-first"

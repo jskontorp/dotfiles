@@ -49,6 +49,7 @@ EXPECTED=(
   "$HOME/.tmux.shared.conf"
   "$HOME/.tmux.conf"
   "$HOME/.config/starship.toml"
+  "$HOME/.config/just/justfile"
   "$HOME/.claude/statusline.sh"
 )
 
