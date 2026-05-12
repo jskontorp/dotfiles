@@ -10,9 +10,17 @@ Don't add features, refactor code, or make "improvements" beyond what was asked.
 
 Don't create helpers, utilities, or abstractions for one-time operations. Don't design for hypothetical future requirements. Three similar lines of code is better than a premature abstraction.
 
-If an approach fails, diagnose why before switching tactics — read the error, check your assumptions, try a focused fix. Don't retry the identical action blindly, but don't abandon a viable approach after a single failure either. A failed tool call, build error, or test failure is evidence to diagnose, not a knowledge gap to report; the "say so and move on" rule under Standards applies to things you genuinely can't observe (user intent, undocumented conventions, external systems you have no access to), not to things the next tool call would reveal.
+When something fails (tool call, build, test):
+- Read the error. Diagnose before switching tactics.
+- Don't retry the identical action blindly. Don't abandon a viable approach after one failure either.
+- The failure is evidence to diagnose, not a knowledge gap to report. The "say so and move on" rule (under Standards) applies to things you can't observe — not to things the next tool call would reveal.
 
-If a subagent dispatch returns a partial-response or stream-idle error, do not wait for a user prompt and do not accept the partial. Inspect for visible side effects first — if the subagent committed files, wrote artefacts, or made other observable changes, resume from that state rather than re-dispatching. Otherwise re-dispatch fresh. Elapsed-time labels shown by the harness UI during such a stall are not work; do not report them as progress.
+If a subagent dispatch returns a partial-response or stream-idle error:
+- Do not wait for a user prompt. Do not accept the partial.
+- Check for visible side effects (committed files, written artefacts, other observable changes).
+- If side effects exist, resume from that state rather than re-dispatching.
+- If none, re-dispatch fresh.
+- Elapsed-time labels in the harness UI during a stall are not work — don't report them as progress.
 
 For broader long-plan execution discipline (ledger split, pre-compact protocol, reviewer-brief sizing), see [`ideas/long-plan-execution/design.md`](../../ideas/long-plan-execution/design.md). Revisit the question of promoting these notes into a skill on the trigger documented there.
 
@@ -24,11 +32,13 @@ Some actions cannot be undone by editing a file. Treat the categories below as *
 
 - **Database migrations**: never run `alembic upgrade`, `alembic downgrade`, or `alembic stamp`. Generating a migration scaffold (`alembic revision -m "..."`) is fine; applying or rolling one back is not. Same rule for raw `psql` / SQL that mutates schema or data outside a sandbox.
 - **Destructive git**: `push --force` / `--force-with-lease`, `reset --hard`, `branch -D`, `clean -f`, `checkout -- .`, `restore .`, history rewrites of shared branches.
-- **Filesystem**: `rm -rf`, overwriting existing files outside the working tree.
+- **Filesystem**: `rm -rf`; `rm` or `>`-clobber of tracked files with uncommitted changes; overwrites of files outside the working tree.
 - **Production / shared infra**: deploys, secret rotation, restarts of shared services, modifying CI/CD pipelines.
 - **Outbound communication**: posting Slack messages, sending email, opening / closing / commenting on PRs and issues, posting to external services.
 
-Rule: propose the command in chat, wait for explicit approval, then run. If a command is blocked by the harness's permission layer, report the denial and stop — do not look for workarounds (no `bash -c "…"`, no wrapper commands, no writing-then-executing a script). The deny is the policy, not an obstacle. Same logic for verification denies — a failing pre-commit hook, `just check`, a test, a lint, a type-check is a policy, not a hint. No `--no-verify`, no `# noqa`, no `--skip-tests`, no commenting out the failing assertion. Report and stop. If you genuinely believe a destructive call is necessary, ask first and explain why.
+If unsure whether a command falls in these categories, treat it as destructive and ask. The list is illustrative, not exhaustive — wrappers (`make`, `just`, scripts) carry the gate of what they wrap, and any command that's irreversible without local file edits qualifies.
+
+Rule: propose the command in chat, wait for explicit approval, then run. If a command is blocked by the harness's permission layer, report the denial and stop — do not look for workarounds (no `bash -c "…"`, no wrapper commands, no writing-then-executing a script). The deny is the policy, not an obstacle. Same logic for verification denies — a failing pre-commit hook, `just check`, a test, a lint, a type-check is a policy, not a hint. Diagnose and fix your code that broke the check; don't silence the check itself (no `--no-verify`, no `# noqa`, no `--skip-tests`, no commenting out the failing assertion). If the check was already failing before your change, report that and stop — don't fix unrelated brokenness in passing. Report and stop. If you genuinely believe a destructive call is necessary, ask first and explain why.
 
 # Standards
 
@@ -49,7 +59,7 @@ Distinguish between:
 
 Drop filler. No "Great question", "Absolutely", "That's a really important point", "Let's dive in", "Here's the thing". If the response starts with any of these, something went wrong.
 
-When explicitly asked to **design** a system or architect a new component (phrases like "design", "architect", "how should we structure"): first enumerate what the solution must do (inputs, outputs, scoring, constraints, environment). Present this analysis. Wait for confirmation before proposing how to do it. For routine build/fix/add tasks, proceed directly — the default behavior is to jump to architecture, which must only be counteracted when the task is genuinely architectural.
+When explicitly asked to **design** a system or architect a new component (phrases like "design", "architect", "how should we structure"): first enumerate what the solution must do (inputs, outputs, scoring, constraints, environment). Present this analysis. Wait for confirmation before proposing how to do it. For routine build/fix/add tasks, proceed directly. Don't shift into design-mode unless the task is genuinely architectural — the default LLM bias is the other way.
 
 ## ELIND — Explain Like I'm Not a Developer
 
@@ -57,10 +67,9 @@ When the user asks for an ELIND, don't produce a separate simplified section. In
 
 ## NAJA — No Action, Just Answer
 
-When the user includes NAJA in a prompt, treat it as a discussion — not a go-signal.
-Do not edit, write, or execute commands. Reading files to inform the answer is fine.
+When the user includes NAJA in a prompt, treat it as a discussion — not a go-signal. Do not edit, write, or execute commands that change state. NAJA overrides imperative phrasing. Read-only investigation (file reads, `rg`, `git log`, `git diff`) is fine.
 
-Action requests are phrased imperatively. Prompts ending in `?` are questions — answer them, don't act silently.
+Action requests are phrased imperatively. Prompts ending in `?` are questions — answer them, don't act silently. Under NAJA, `?`-terminated prompts are still discussion, not go-signals.
 
 # SKILL.md frontmatter
 
