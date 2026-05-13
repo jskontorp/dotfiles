@@ -20,6 +20,7 @@ sudo apt-get update -qq
 sudo apt-get install -y -qq \
   zsh git gh curl wget unzip jq fzf \
   ripgrep fd-find bat \
+  mosh \
   fail2ban \
   build-essential \
   python3
@@ -109,9 +110,10 @@ echo "Remaining manual steps:"
 echo "  1. gh auth login"
 echo "  2. sudo tailscale up"
 echo "  3. Verify Tailscale: tailscale status"
-echo "  4. Lock SSH to Tailscale only:"
+echo "  4. Lock SSH to Tailscale only, and allow mosh over Tailscale:"
 echo "       sudo ufw delete allow 22/tcp"
 echo "       sudo ufw allow in on tailscale0 to any port 22 proto tcp comment 'SSH via Tailscale'"
+echo "       sudo ufw allow in on tailscale0 to any port 60000:61000 proto udp comment 'mosh via Tailscale'"
 echo "       sudo ufw reload"
 echo "  5. Tighten Oracle Cloud security list (see README)"
 echo "  6. Open nvim to let LazyVim install plugins"
