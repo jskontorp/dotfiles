@@ -33,6 +33,7 @@ For each criterion that applies, give a verdict (✅ aligned / ⚠ partial / ❌
 7. **Trigger-matrix / docs coherence** — new rows AGENTS.md (or equivalent) needs; existing rows that need updating; which command catches regressions in the new code itself.
 8. **Failure modes the proposal hasn't named** — examples to consider: partially-completed previous run, manually-edited state file, foreign symlink, dest path read-only, case-insensitive filesystem name-collision, an artefact the proposal assumes exists but that's absent on installs predating the change.
 9. **Migration hazard** — host / repo / database that ran the *old* code and now runs the *new* code. Is that path safe, or does it require a migration step the proposal doesn't name?
+10. **Ticket / commit boundary** — is the proposal's scope the right unit of work? Should any piece be filed as a sibling ticket or a separate commit? Common signals that scope is wrong: adjacent infrastructure that exists only to enable the named goal (helper libs, enforcement guards), independent failure modes that could land on their own timeline, or pieces a future bisect would want to isolate. The goal is not to enforce one-ticket-per-commit purity — it's to surface the boundary question explicitly so the author can confirm bundling was deliberate, not unilateral.
 
 ## Output
 
