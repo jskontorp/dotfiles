@@ -78,11 +78,11 @@ EXPECTED=(
 
 # Git hooks live under $REPO_DIR/.git/hooks/, gated by install.sh on `.git`
 # being a directory (Docker tests run from a non-git checkout, so the gate
-# fires there too — mirror it). Once JSK-36's commit-msg hook propagates,
-# add it here in a follow-up commit (tracked in JSK-41).
+# fires there too — mirror it).
 if [[ -d "$REPO_DIR/.git" ]]; then
   EXPECTED+=(
     "$REPO_DIR/.git/hooks/pre-commit"
+    "$REPO_DIR/.git/hooks/commit-msg"
   )
 fi
 
