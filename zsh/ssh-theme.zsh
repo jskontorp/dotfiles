@@ -6,6 +6,14 @@
 #
 # NOTE: background-opacity can't be changed per-session (it's a Ghostty
 # window-level setting). At 0.96 the transparency is barely visible anyway.
+#
+# POLICY: `ssh` is the default for remote shells. Reach for `mosh` only when
+# UDP roaming / suspend-resume / flaky-link resilience actually matters —
+# mosh has no scrollback by design (State Synchronisation Protocol syncs the
+# visible viewport, never sends scrolled-off bytes; upstream #122 declined,
+# unfixable client-side). Do NOT alias `ssh=mosh` here or anywhere; the
+# friction of typing `mosh` in full is the intended signal that you're
+# trading scrollback / native search / mouse selection for resilience.
 
 # Local Ghostty background (must match ghostty/config)
 _LOCAL_BG="#181825"
