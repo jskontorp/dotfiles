@@ -268,16 +268,15 @@ status:
 
 # --- Management ---
 
-# Symlink all configs.
-#
-# Refuses to run from a worktree (any cwd whose canonical-repo-dir differs
-# from {{DOTFILES}}). Re-pointing every `~` symlink at a worktree path produces
-# dangling symlinks the moment that worktree is removed (`git worktree remove`),
-# and per pi/agent/AGENTS.md's worktree-default rule the canonical checkout is
-# the only valid linking source. The cascade: every recipe that auto-runs
+# Re-pointing every `~` symlink at a worktree path produces dangling symlinks
+# the moment that worktree is removed (`git worktree remove`), and per
+# pi/agent/AGENTS.md's worktree-default rule the canonical checkout is the
+# only valid linking source. The cascade: every recipe that auto-runs
 # `just link` (new-skill / edit-skill / add-skill / update-skill, JSK-37)
 # inherits this refusal — skill-mutation must happen from canonical. The fix
 # is a one-liner: `cd ~/code/personal/dotfiles && just <recipe>`.
+#
+# Symlink all configs (refuses from a worktree; canonical-only).
 link:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -294,18 +293,20 @@ link:
     fi
     {{DOTFILES}}/install.sh
 
-# Reverse install.sh: remove every symlink recorded in .install-manifest.
-# Idempotent. The manifest is the contract — see uninstall.sh's footer
-# for the things this does NOT touch (pnpm globals, Brewfile, tmux/claude
-# plugins, ~/.gitconfig.local, etc.). For a full Mac tear-down including
-# brew + plugin caches + pi/Claude state, see `just uninstall-full`.
+# The manifest is the contract — see uninstall.sh's footer for the things
+# this does NOT touch (pnpm globals, Brewfile, tmux/claude plugins,
+# ~/.gitconfig.local, etc.). For a full Mac tear-down including brew +
+# plugin caches + pi/Claude state, see `just uninstall-full`.
+#
+# Reverse install.sh: remove every symlink in .install-manifest. Idempotent.
 uninstall:
     {{DOTFILES}}/uninstall.sh
 
-# Nuclear uninstall (Mac-only): reverse install.sh AND remove Brewfile
-# packages, pnpm globals, plugin caches, OrbStack runtime, pi credentials
-# and sessions. Preserves ~/.gitconfig.local, ~/.zsh_history, and the
-# dotfiles checkout. Requires --yes (no interactive prompt). Idempotent.
+# Reverses install.sh AND removes Brewfile packages, pnpm globals, plugin
+# caches, OrbStack runtime, pi credentials and sessions. Preserves
+# ~/.gitconfig.local, ~/.zsh_history, and the dotfiles checkout. Idempotent.
+#
+# Nuclear Mac uninstall: install.sh + brew + pnpm + plugin/pi state. Requires --yes.
 uninstall-full *args:
     {{DOTFILES}}/uninstall-full.sh {{args}}
 
@@ -380,9 +381,10 @@ skills:
     print()
     print(f"({len(entries)} skills tracked by dotfiles. Pi sessions also load skills shipped by installed pi packages, e.g. setup-oauth + workspace-explorer from @feniix/pi-notion.)")
 
-# Fast host-side checks: justfile parity, manifest integrity, bash-portability.
-# Sub-second; safe to run before every commit. For the full Docker integration
-# suite, use `just test`.
+# Sub-second; safe to run before every commit (wired into git/hooks/pre-commit).
+# For the full Docker integration suite, use `just test`.
+#
+# Fast host-side checks: justfile, manifest, bash portability, gates, tsc, Brewfile.
 [group('test')]
 check:
     #!/usr/bin/env bash
@@ -422,11 +424,13 @@ check:
       printf "  — skipped on non-Darwin\n"
     fi
 
-# Probe the runtime preconditions an agentic session needs: tool versions on
-# PATH, $DOTFILES env matches this checkout, manifest symlinks intact, Claude
-# plugins materialised against settings.json's enabledPlugins, and the
-# notion-routing cwd→auth-file mapping behaves. No network calls; no keychain
-# probing (those surface naturally when used). Exit non-zero on any failure.
+# Checks an agentic session's runtime: tool versions on PATH, $DOTFILES env
+# matches this checkout, manifest symlinks intact, Claude plugins materialised
+# against settings.json's enabledPlugins, and the notion-routing cwd→auth-file
+# mapping behaves. No network calls; no keychain probing (those surface
+# naturally when used). Exit non-zero on any failure.
+#
+# Probe runtime: tool PATH, $DOTFILES, symlinks, claude plugins, notion routing.
 [group('test')]
 doctor:
     #!/usr/bin/env bash
@@ -525,8 +529,9 @@ doctor:
     fi
     exit $rc
 
-# Run dotfiles install validation in Docker (full integration). For fast
-# skill unit tests, use `just test-skills` / `just test-skill <name>`.
+# For fast skill unit tests, use `just test-skills` / `just test-skill <name>`.
+#
+# Run full dotfiles install validation in Docker (mac + vm). Slow.
 [group('test')]
 test target="both":
     {{DOTFILES}}/test/verify.sh {{target}}
@@ -543,9 +548,10 @@ test-skill name:
     fi
     exec "$runner"
 
-# Run unit tests across every skill that has a `tests/run.sh`. Tolerates
-# missing tests/ (most skills don't have any); fails overall if any skill's
-# suite fails.
+# Tolerates missing tests/ (most skills don't have any); fails overall if
+# any skill's suite fails.
+#
+# Run unit tests across every skill that has a tests/run.sh.
 [group('test')]
 test-skills:
     #!/usr/bin/env bash
@@ -568,9 +574,10 @@ test-skills:
 
 # --- Claude Code plugins ---
 
-# Install every plugin listed in ~/.claude/settings.json's enabledPlugins map.
-# Idempotent — `claude plugin install` is a no-op on already-installed plugins.
-# Run on a fresh machine after `just link` to materialise the plugin set.
+# `claude plugin install` is a no-op on already-installed plugins. Run on
+# a fresh machine after `just link` to materialise the plugin set.
+#
+# Install every enabled plugin from ~/.claude/settings.json. Idempotent.
 [group('claude')]
 claude-plugins-install:
     #!/usr/bin/env bash
@@ -666,8 +673,10 @@ new-skill name:
     ${EDITOR:-nvim} "$dir/SKILL.md" || true
     just link
 
-# Add a marketplace skill to pi/skill-lock.json. Fetches HEAD SHA (unless --rev),
-# appends entry, runs `just link`. Use --dry-run to preview.
+# Add a marketplace skill to pi/skill-lock.json + install.
+#
+# Fetches HEAD SHA (unless rev given), appends entry, runs `just link`.
+# Use dry-run as 6th arg to preview without writing.
 # Usage: just add-skill <url> <name> [subpath] [scope] [rev] [dry-run]
 # Positional args:
 #   url         upstream GitHub URL
@@ -680,6 +689,8 @@ new-skill name:
 #   just add-skill https://github.com/vercel-labs/skills find-skills
 #   just add-skill https://github.com/neondatabase/agent-skills neon-postgres skills/neon-postgres project:volve-ai
 #   just add-skill https://github.com/x/y my-skill skills/my-skill global '' dry-run
+#
+# Add a marketplace skill to pi/skill-lock.json + install. Dry-run as 6th arg previews.
 [group('edit')]
 add-skill url name subpath="" scope="global" rev="" dry_run="":
     #!/usr/bin/env bash
@@ -743,7 +754,6 @@ add-skill url name subpath="" scope="global" rev="" dry_run="":
     just link
 
 # Bump a marketplace skill's pinned SHA to upstream HEAD, then re-install.
-# Usage: just update-skill <name>
 [group('edit')]
 update-skill name:
     #!/usr/bin/env bash
