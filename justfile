@@ -371,6 +371,8 @@ check:
     bash {{DOTFILES}}/test/validate-manifest.sh
     printf "\nbash portability:\n"
     bash {{DOTFILES}}/test/check-bash-portability.sh
+    printf "\ncanonical-path helper:\n"
+    bash {{DOTFILES}}/test/check-canonical-path.sh
     printf "\ndestructive-gate patterns:\n"
     bash {{DOTFILES}}/test/check-destructive-gate.sh
     printf "\nextensions (typescript):\n"
