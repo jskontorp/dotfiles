@@ -405,6 +405,8 @@ check:
     bash {{DOTFILES}}/test/check-destructive-gate.sh
     printf "\nregression-class provenance:\n"
     bash {{DOTFILES}}/test/check-regression-provenance.sh
+    printf "\ngit-env isolation (JSK-44):\n"
+    bash {{DOTFILES}}/test/check-git-env-isolation.sh
     printf "\nextensions (typescript):\n"
     if ! command -v tsc >/dev/null 2>&1; then
       printf "  ⚠ tsc not on PATH — skipped (run 'just update' to install)\n" >&2
