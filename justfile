@@ -371,6 +371,8 @@ check:
     bash {{DOTFILES}}/test/validate-manifest.sh
     printf "\nbash portability:\n"
     bash {{DOTFILES}}/test/check-bash-portability.sh
+    printf "\ndestructive-gate patterns:\n"
+    bash {{DOTFILES}}/test/check-destructive-gate.sh
     printf "\nextensions (typescript):\n"
     if ! command -v tsc >/dev/null 2>&1; then
       printf "  ⚠ tsc not on PATH — skipped (run 'just update' to install)\n" >&2
