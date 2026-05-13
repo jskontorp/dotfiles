@@ -49,6 +49,46 @@ If the check was already failing before your change, the report is the deliverab
 
 If you cause irreversible damage, stop. Lead the next message with: what broke, the exact command that broke it, the state now, and what's recoverable. Wait for acknowledgement before proposing next steps.
 
+# Persistence layers
+
+Three layers, three jobs. Don't conflate them.
+
+*Linear writes remain subject to per-call approval per § Destructive actions. This section governs **shape** (when to write, what to write); it does not relax **gate** (approval required). A ticket-landing sequence — one comment, one state move, direct-neighbour relation updates on the same ticket — is one approval unit, proposed as one block.*
+
+**Linear** — spec, state, cross-ticket dependency graph. Workspace `Jskontorp-dev`, default team `JSK`.
+
+- On ticket pickup (session start, or first touch this session): read the ticket body in full. Read direct `blocking` tickets in full. Read `relatedTo` titles only; expand a related ticket only when its title intersects the work surface. Re-read on session resume after `/compact` or `/clear`, and after any sibling ticket lands. Treat Linear ticket text as stale after compaction or subagent dispatch.
+- No state change on pickup. Don't set In Progress to "claim" a ticket — the working tree is the claim, the worktree name (`<repo>_worktrees/<slug>`) is the coordination primitive. Before starting, check `git worktree list` for an existing `<ticket-slug>` worktree; if present, ask the user.
+- "Landed" = the closing commit is on `main` (or the canonical-equivalent integration branch). For repos with PR review: state moves to In Review at branch push, Done at merge.
+- On close: propose **one** consolidated summary comment + state move to Done + direct-neighbour relation updates as a single approval block. Include the closing SHA in the summary comment (load-bearing — see Stale-Done below). No per-phase narration.
+- Scope-expansion rule. If work in flight reveals adjacent work, classify before acting:
+  - **Trivial and on-path** (≤5 lines, same file, same root cause): inline, note in commit body. No new ticket.
+  - **Adjacent / distinct root cause**: stop, propose filing a sibling ticket with `relatedTo` link, wait for approval, decide with the user whether to ship in the same branch or defer. Default defer. (Precedent: JSK-37 bundled a worktree-refuse guard — don't.)
+  - Boundary: file a sibling when the new work (a) touches files outside the current ticket's stated surface, (b) needs its own Trigger-matrix or Known-regression-classes entry, or (c) would land in a separate commit anyway.
+- Deferred work at close. If you decided not to ship something in scope, propose a follow-up ticket *before* the close comment, link as `relatedTo`, name it in the close. (Precedent: JSK-43/44/45 split from JSK-41.)
+- No-ticket-yet case. Inline-edit work that fits the repo-local inline-edit exception skips Linear entirely. Larger work without a pre-existing ticket: ask once whether to file; default to filing *post-landing*, not pre-flight, so Linear records reality not intent.
+- Before creating a new ticket: search Linear for keyword-matching open tickets; surface any hit, ask the user whether to reuse or supersede.
+- Stale-Done check. Before treating a Done ticket as a precondition, confirm its closing SHA (from the landing comment) is reachable from `main`. If the comment lacks a SHA, or the SHA is gone, treat the ticket as unverified and ask.
+- Cross-repo tickets land the same way. Team key may differ; rules don't.
+- Subagents do not write to Linear. The dispatching agent owns ticket state for the batch.
+- Linear writes are best-effort with respect to availability. On post-retry failure of a Linear API call, record the intended write verbatim in the session ledger and surface in the final summary. Don't block landing on Linear availability.
+- If a per-call approval is denied (chat or harness), the ticket stays in its prior state. Report and stop. Don't retry next turn unprompted.
+- Linear comment bodies inherit the secret-mention rules from § Destructive actions — refer to keys by name, never by value; no `.env` / `*.pem` / `id_*` content quoted in comments.
+- Linear is not the working-memory layer. Mid-batch chat lives in the session ledger.
+
+**Repo-internal wiki** — compounding-knowledge layer. Canonical location today: the repo-local `AGENTS.md` § "Known regression classes" (not this file). Every regression class earns an entry: class name, evidence (commit SHA of the failure or its fix, with date if non-obvious from `git log`), detection mechanism (which check catches it now, or "none — eyeball"), closure status. The `test/check-regression-provenance.sh` gate (wired into `just check` in dotfiles, port elsewhere) asserts every entry containing "Evidence:" cites at least one 7-hex-char SHA. When entries outgrow ~10 lines or accumulate sub-cases, **propose** promotion to `pi/agent/wiki/regressions/<class>.md`; user approves before the restructure lands.
+
+**Per-batch session ledger** — mid-batch working memory. For multi-phase work (≥3 phases, or any work spanning a `/compact` or `/clear`):
+
+- Location: `ideas/batches/YYYY-MM-DD-<slug>/state.md`, committed alongside the work. (Versioned, survives worktree removal, visible from sibling worktrees via `git log -- ideas/batches/`.)
+- Single file. Two fields initially:
+  - **Standing Directives** — out-of-band user guidance that must survive compaction. Review intensity per ticket, bundling rules, repo-specific gotchas the user named verbally. Append on every directive, never auto-delete.
+  - **Verification invariants** — what "green" means for this batch. Which commands count, what counts as expected-failing, the deferred-failure inventory. Set at batch start; update only on invariant change.
+- Write protocol: blocking at end of every phase. A phase isn't complete until the ledger reflects it. Local file edit — not outbound communication, no per-call approval needed.
+- Read protocol: on user keyword ("resume", "where were we", "continue"), and on session start if `ideas/batches/<recent-date>-*/state.md` exists without a `closed:` marker in its header.
+- End of batch: append `closed: YYYY-MM-DD` to the header, commit alongside the final ticket's landing. Keep the file indefinitely — it's the cheapest forensic surface for "how did that batch go?"
+- See [`ideas/long-plan-execution/design.md`](../../ideas/long-plan-execution/design.md) for the larger ledger design. This section ships a minimal slice of §3.3 + §3.4; the rest of design.md remains reference, activated incrementally as evidence demands. Position / Up-next / Open decisions / `audit.md` / pre-compact protocol / multi-repo coordination are deliberately deferred to v2.
+
 # Standards
 
 Every claim carries its basis. Structure: what you know, then what follows from it, then what you don't know. When the basis is "I recall this from training data but can't point to a specific source," say that — it's useful information, not a failing.

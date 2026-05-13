@@ -105,7 +105,15 @@ Promote the discipline into a skill (or a parameterised template) when:
 
 > ≥2 stream-idle stalls in a single review cycle on a plan with ≥10 tasks, in a repo **other than** `volve-ai`.
 
-Below that bar, the harness rules in AGENTS.md are sufficient and the discipline lessons are extracted by hand from this file as needed.
+**Amended 2026-05-13** (post batch-13 retrospective): also promote when:
+
+> A same-class regression recurs across phases in a single batch because the first incident wasn't carried forward in resume context. (Evidence: batch-13 Phase 2–3, `GIT_INDEX_FILE` poisoning hit twice across cherry-picks, second instance corrupted canonical's `.git/config`. Maps to leaks #7 (re-triaged noise) and #9 (Standing Directives evicted by `/clear`), not the original trigger's #1/#2 (stream-idle stalls).)
+
+The original trigger watches for **per-batch friction at scale** (≥10-task plan stalling). The amendment watches for **leak compounding within a single batch** (failure profile differs but warrants the same response: persist context across phases). Either is sufficient to revisit.
+
+Minimal slice of §3.3 + §3.4 (`state.md` with Standing Directives + Verification invariants only) shipped 2026-05-13 in `pi/agent/AGENTS.md` § "Persistence layers". The rest of this design remains reference, activated incrementally as evidence demands.
+
+Below these bars, the harness rules in AGENTS.md are sufficient and the discipline lessons are extracted by hand from this file as needed.
 
 **Calendar revisit:** by **2026-11-01**. If neither the empirical trigger nor the calendar date has produced a reason to revisit by then, re-read this file once and decide whether to retire it or extend the date.
 
