@@ -19,6 +19,13 @@ After the harness blocks a command, any of these in the next few tool calls is a
 
 After a check (lint, type-check, test, pre-commit) fails, any of these in the diff is a violation unless the user explicitly approved scope expansion:
 
+<!-- silencing-gate:begin --
+     The commit-msg hook (git/lib/silencing-gate.sh, JSK-36) parses every
+     backticked token between this marker and silencing-gate:end as a
+     literal pattern to refuse in staged additions. Behavioural bullets
+     without backticks are human-review-only. Do not move or rename the
+     markers without updating the lib's section-anchor logic. -->
+
 **Suppression flags / annotations:**
 - `--no-verify` (git commit / git push)
 - `--skip-tests`, `--no-tests`, similar test-bypass flags
@@ -34,6 +41,8 @@ After a check (lint, type-check, test, pre-commit) fails, any of these in the di
 - New `--ignore=` paths
 - Lowering coverage thresholds in config
 - Removing files from a test glob
+
+<!-- silencing-gate:end -->
 
 **Assertion-weakening:**
 - Replacing `assertEquals(x, y)` with `assertTrue(x is not None)`

@@ -559,6 +559,7 @@ done
 if [[ -d "$DOTFILES/.git" ]]; then
   mkdir -p "$DOTFILES/.git/hooks"
   _link "$DOTFILES/git/hooks/pre-commit" "$DOTFILES/.git/hooks/pre-commit"
+  _link "$DOTFILES/git/hooks/commit-msg" "$DOTFILES/.git/hooks/commit-msg"
 fi
 
 echo "✅ Dotfiles linked ($MACHINE)"

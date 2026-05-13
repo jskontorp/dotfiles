@@ -1,0 +1,88 @@
+#!/bin/bash
+# commit-msg hook (JSK-36): refuse staged additions matching the
+# check-silencing patterns from pi/agent/review-patterns.md.
+# Symlinked into .git/hooks/ by install.sh.
+#
+# Override: add a non-empty `Silencing-approved: <reason>` trailer to the
+# commit message. (`--no-verify` also bypasses, but is itself gated by
+# pi/agent/extensions/destructive-gate.ts.)
+# Test harness escape: SKIP_SILENCING_GATE=1 git commit ...
+#
+# Sources git/lib/silencing-gate.sh — the patterns themselves live in the
+# review-patterns.md catalogue, parsed at every invocation.
+set -euo pipefail
+
+MSG_FILE="$1"
+COMMIT_SOURCE="${2:-}"
+
+# Skip merge / squash commits — merging a branch that legitimately bumps an
+# eslint config or adds a new # noqa shouldn't trip this.
+case "$COMMIT_SOURCE" in
+  merge|squash) exit 0 ;;
+esac
+
+# Resolve canonical (not the calling worktree) so a commit from a worktree on
+# a branch that pre-dates this lib still finds it. Same idiom as
+# git/lib/canonical-path.sh — inlined here to keep the hook bootstrap-free.
+# Regression class: pi/agent/AGENTS.md "Canonical-side hook scripts that
+# source canonical-only paths".
+CANONICAL_DIR="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
+GATE_LIB="$CANONICAL_DIR/git/lib/silencing-gate.sh"
+
+if [[ ! -f "$GATE_LIB" ]]; then
+  # Warn-and-skip rather than hard-fail: a worktree on a branch that pre-dates
+  # this lib should still be able to commit. The gate is best-effort; if the
+  # lib is missing on canonical itself, that's an install problem to surface.
+  printf "⚠ silencing-gate: pattern library missing at %s — skipping check.\n" "$GATE_LIB" >&2
+  printf "  Run 'just link' from canonical to repair, or set SKIP_SILENCING_GATE=1 to silence.\n" >&2
+  exit 0
+fi
+
+# shellcheck source=../lib/silencing-gate.sh
+. "$GATE_LIB"
+
+# Capture rc separately so the `RC=2` (refusing to run on zero patterns)
+# sentinel from the lib actually fails the hook instead of being swallowed
+# by `|| true`. Earlier version's `... || true` swallowed RC=2 → empty hits
+# array → exit 0 → fail-open. (JSK-36 reviewer 🔴 #2.)
+scan_rc=0
+scan_out="$(silencing_gate_scan_staged_added)" || scan_rc=$?
+if [[ $scan_rc -eq 2 ]]; then
+  printf "❌ silencing-gate: refusing to run — no patterns parsed from %s\n" "$SILENCING_GATE_PATTERNS_MD" >&2
+  printf "   The pattern source may have been renamed, its sentinels removed, or the awk\n" >&2
+  printf "   slice broken. Investigate before bypassing — a missing-patterns gate is a fail-open gate.\n" >&2
+  exit 1
+fi
+
+hits=()
+while IFS= read -r line; do
+  [[ -n "$line" ]] && hits+=("$line")
+done <<< "$scan_out"
+
+[[ ${#hits[@]} -eq 0 ]] && exit 0
+
+# Hits present → look for the override trailer. (`command -v git` guard
+# dropped: the hook has unguarded `git` invocations above this point.)
+trailer_value="$(
+  git interpret-trailers --parse --no-divider <"$MSG_FILE" 2>/dev/null \
+    | sed -nE 's/^Silencing-approved:[[:space:]]*//p' \
+    | head -1
+)"
+# Strip surrounding whitespace.
+trailer_value="${trailer_value#"${trailer_value%%[![:space:]]*}"}"
+trailer_value="${trailer_value%"${trailer_value##*[![:space:]]}"}"
+
+if [[ -n "$trailer_value" ]]; then
+  printf "✓ silencing-gate: %d hit(s) approved via trailer (%s)\n" \
+    "${#hits[@]}" "$trailer_value" >&2
+  exit 0
+fi
+
+printf "❌ silencing-gate: staged addition(s) match check-silencing patterns:\n" >&2
+printf "   %s\n" "${hits[@]}" >&2
+printf "\nRemediation:\n" >&2
+printf "  • Fix the underlying check rather than silence it.\n" >&2
+printf "  • If the suppression is deliberate and approved, add a trailer:\n" >&2
+printf "      Silencing-approved: <one-line reason>\n" >&2
+printf "  • Source of patterns: pi/agent/review-patterns.md (Check-silencing §)\n" >&2
+exit 1
