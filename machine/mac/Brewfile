@@ -30,6 +30,11 @@ brew "just"
 brew "shellcheck"       # pre-commit lint for *.sh
 brew "libpq"           # psql/pg_dump client (keg-only; PATH set in zsh/core.zsh)
 
+# Project: iphone-shortcuts (~/code/personal/iphone-shortcuts)
+# Cherri compiles a DSL to .shortcut files; LLM-driven authoring lives in that repo.
+tap "electrikmilk/cherri"
+brew "cherri"
+
 # GUI apps
 cask "ghostty"
 
