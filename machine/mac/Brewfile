@@ -22,6 +22,7 @@ brew "zsh-syntax-highlighting"
 
 # Dev tools
 brew "tmux"
+brew "mosh"           # low-latency shell with local echo (used over Tailscale)
 brew "neovim"
 brew "node"
 brew "pnpm"

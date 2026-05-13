@@ -1,4 +1,5 @@
-# ssh-theme.zsh — Change terminal background on SSH to visually distinguish remote sessions
+# ssh-theme.zsh — Change terminal background on remote sessions to visually
+# distinguish them from local. Wraps both `ssh` and `mosh`.
 #
 # Uses OSC 11 (set bg) escape sequences.
 # Ghostty, iTerm2, and most modern terminals support these.
@@ -13,11 +14,16 @@ _LOCAL_BG="#181825"
 typeset -A _SSH_BG
 _SSH_BG[oracle]="#0f2028"   # dark teal tint — immediately distinguishable
 
-ssh() {
-  local host=""
-  local bg=""
+# Run a remote-shell command ($1 = ssh|mosh) with a host-specific terminal
+# background, restoring the local bg on exit. Hostname is parsed from args
+# using ssh's flag conventions; mosh-only short flags that take values
+# (rare in practice) may misparse — the wrapper degrades to no-bg-change
+# rather than misfiring.
+_with_host_bg() {
+  local cmd="$1"; shift
+  local host="" bg=""
 
-  # Parse hostname from ssh args (skip flags and their values)
+  # First non-flag argument is the host (skip ssh flags and their values).
   local skip_next=false
   for arg in "$@"; do
     if $skip_next; then skip_next=false; continue; fi
@@ -30,19 +36,13 @@ ssh() {
 
   bg="${_SSH_BG[$host]}"
 
-  if [[ -n "$bg" ]]; then
-    # Change background before SSH
-    printf '\e]11;%s\e\\' "$bg"
-  fi
-
-  # Run real ssh
-  command ssh "$@"
+  [[ -n "$bg" ]] && printf '\e]11;%s\e\\' "$bg"
+  command "$cmd" "$@"
   local ret=$?
-
-  if [[ -n "$bg" ]]; then
-    # Restore local background after SSH exits
-    printf '\e]11;%s\e\\' "$_LOCAL_BG"
-  fi
+  [[ -n "$bg" ]] && printf '\e]11;%s\e\\' "$_LOCAL_BG"
 
   return $ret
 }
+
+ssh()  { _with_host_bg ssh  "$@"; }
+mosh() { _with_host_bg mosh "$@"; }
