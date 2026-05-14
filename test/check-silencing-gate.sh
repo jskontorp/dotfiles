@@ -90,6 +90,39 @@ for probe in "${NEGATIVE_PROBES[@]}"; do
   [[ $hit -eq 0 ]] && ok "no false positive: '$probe'" || bad "false positive on: '$probe'"
 done
 
+# --- Unit: path allowlist self-exemption (JSK-45) --------------------------
+# The allowlist regex must exempt the gate's own files (otherwise editing
+# them would be blocked by the gate itself — chicken-and-egg). Symmetric
+# near-miss control: paths that look similar but are NOT the gate's own
+# files must NOT match.
+printf "\nunit: path allowlist self-exemption\n"
+declare -a EXEMPT_PATHS=(
+  "git/hooks/commit-msg"
+  "git/lib/silencing-gate.sh"
+  "test/check-silencing-gate.sh"
+)
+for p in "${EXEMPT_PATHS[@]}"; do
+  if [[ "$p" =~ $SILENCING_GATE_ALLOWLIST_RE ]]; then
+    ok "allowlist exempts $p"
+  else
+    bad "allowlist does NOT exempt $p (gate self-maintenance would be blocked)"
+  fi
+done
+declare -a NEAR_MISS_PATHS=(
+  "git/hooks/pre-commit"           # sibling hook, no self-edit needs
+  "git/lib/secret-gate.sh"         # sibling lib
+  "test/check-secret-gate.sh"      # sibling test
+  "git/lib/silencing-gate.sh.bak"  # path-suffix attack on the regex anchor
+  "prefix/git/lib/silencing-gate.sh" # path-prefix attack on `^` anchor
+)
+for p in "${NEAR_MISS_PATHS[@]}"; do
+  if [[ "$p" =~ $SILENCING_GATE_ALLOWLIST_RE ]]; then
+    bad "allowlist incorrectly exempts $p (regex over-broad)"
+  else
+    ok "allowlist correctly refuses $p"
+  fi
+done
+
 # --- Integration: real commit-msg hook in a tmprepo ------------------------
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
@@ -215,6 +248,19 @@ else
   cat /tmp/silgate-out >&2
 fi
 git reset -q HEAD; rm -f src/merge_sim.py
+
+# Pass: editing the gate's own test must be allowed (self-exemption, JSK-45).
+# Using test/check-silencing-gate.sh as the fixture target (not the lib or the
+# hook), because the hook sources git/lib/silencing-gate.sh at runtime;
+# corrupting that file mid-test would break the hook itself. The test/ entry
+# in the allowlist exists for exactly this maintenance scenario.
+stage_and_commit pass "self-exempt-test" "edit: check-silencing-gate.sh" \
+  "test/check-silencing-gate.sh|x = 1  # noqa"
+
+# Fail: same diff content, sibling test path NOT in the allowlist. Proves
+# the exemption is path-keyed, not content-keyed (JSK-45 near-miss control).
+stage_and_commit fail "self-exempt-near-miss" "add: check-secret-gate.sh" \
+  "test/check-secret-gate.sh|x = 1  # noqa"
 
 # --- Fail-open guard: `silencing_gate_scan_staged_added` returning 2 ---
 # When the patterns MD is missing / sentinels removed / awk slice broken,
