@@ -37,7 +37,7 @@ SILENCING_GATE_PATTERNS_MD_DEFAULT="$(_silencing_gate_lib_dir)/../../pi/agent/re
 # Files where these tokens legitimately appear (prose, deny-config, the gate
 # itself). Markdown discusses; code adds. Keep tight; the trailer override is
 # the escape hatch for the long tail.
-SILENCING_GATE_ALLOWLIST_RE='(\.md$|^claude/settings\.json$|^claude/agents/|^pi/agent/extensions/(destructive-gate|secret-read-gate)\.ts$|^git/hooks/commit-msg$|^git/lib/silencing-gate\.sh$|^test/check-silencing-gate\.sh$)'
+SILENCING_GATE_ALLOWLIST_RE='(\.md$|^claude/settings\.json$|^claude/agents/|^pi/agent/extensions/(destructive-gate|secret-read-gate)\.ts$|^git/hooks/commit-msg$|^git/lib/silencing-gate\.sh$|^test/check-silencing-gate\.sh$|^test/check-hook-chain\.sh$)'
 
 # --- Pattern extraction -----------------------------------------------------
 # Render one backticked token into an ERE.

@@ -100,6 +100,7 @@ declare -a EXEMPT_PATHS=(
   "git/hooks/commit-msg"
   "git/lib/silencing-gate.sh"
   "test/check-silencing-gate.sh"
+  "test/check-hook-chain.sh"
 )
 for p in "${EXEMPT_PATHS[@]}"; do
   if [[ "$p" =~ $SILENCING_GATE_ALLOWLIST_RE ]]; then
@@ -114,6 +115,8 @@ declare -a NEAR_MISS_PATHS=(
   "test/check-secret-gate.sh"      # sibling test
   "git/lib/silencing-gate.sh.bak"  # path-suffix attack on the regex anchor
   "prefix/git/lib/silencing-gate.sh" # path-prefix attack on `^` anchor
+  "test/check-hook-chain.sh.bak"   # JSK-43: suffix attack on new entry
+  "prefix/test/check-hook-chain.sh" # JSK-43: prefix attack on new entry
 )
 for p in "${NEAR_MISS_PATHS[@]}"; do
   if [[ "$p" =~ $SILENCING_GATE_ALLOWLIST_RE ]]; then
