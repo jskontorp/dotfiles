@@ -1,6 +1,13 @@
 # core.zsh — Shared shell config, sourced by machine-specific zshrc files.
 # History, shell behaviour, aliases, PATH, and terminal integration.
 
+# --- DOTFILES path (load-bearing for several helpers) ---
+# Resolved from this file's own location via zsh's %x expansion + :A modifier
+# (resolve symlinks → absolute). Since `~/.config/zsh/core.zsh` is a symlink
+# into the dotfiles checkout, :A:h:h gives the checkout root, regardless of
+# where the user cloned to (Mac: ~/code/personal/dotfiles, VM: anywhere).
+[[ -n ${DOTFILES:-} ]] || export DOTFILES="${${(%):-%x}:A:h:h}"
+
 # --- History ---
 HISTFILE=~/.zsh_history
 HISTSIZE=10000

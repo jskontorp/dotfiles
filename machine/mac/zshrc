@@ -1,6 +1,13 @@
 # --- Early local overrides (not tracked, runs before everything) ---
 [[ -f ~/.zshrc.pre.local ]] && source ~/.zshrc.pre.local
 
+# --- Dotfiles freshness check (opt-in; see zsh/dotfiles-freshness.zsh) ---
+# Enabled on Mac because this is the primary dotfiles editing surface;
+# warns asynchronously when origin/main is ahead/behind so cross-machine
+# drift surfaces on shell start rather than at commit time. VM keeps it
+# off by default (set in ~/.zshrc.pre.local there if desired).
+export DOTFILES_FRESHNESS=1
+
 # --- Homebrew ---
 eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || /usr/local/bin/brew shellenv 2>/dev/null)"
 

@@ -88,6 +88,7 @@ Three layers, three jobs. Don't conflate them.
 - Read protocol: on user keyword ("resume", "where were we", "continue"), and on session start if `ideas/batches/<recent-date>-*/state.md` exists without a `closed:` marker in its header.
 - End of batch: append `closed: YYYY-MM-DD` to the header, commit alongside the final ticket's landing. Keep the file indefinitely — it's the cheapest forensic surface for "how did that batch go?"
 - See [`ideas/long-plan-execution/design.md`](../../ideas/long-plan-execution/design.md) for the larger ledger design. This section ships a minimal slice of §3.3 + §3.4; the rest of design.md remains reference, activated incrementally as evidence demands. Position / Up-next / Open decisions / `audit.md` / pre-compact protocol / multi-repo coordination are deliberately deferred to v2.
+- **Single-machine assumption.** The ledger format assumes one machine writes a given batch's `state.md` at a time. Concurrent multi-machine writes (Mac + VM writing the same `state.md`) produce non-FF push failures and rebase-mangled ledgers. `just sync` surfaces this passively: if a pulled commit touches any `ideas/batches/**/state.md`, the recipe prints a banner pointing at JSK-49 (which carries the three deferred design options: per-machine filenames, strict-push-per-phase, or accept the risk as-is)—the current shipped behaviour is option (a), accept the risk. Push before machine-switch is the user-side discipline that defers FM-9 indefinitely.
 
 # Standards
 

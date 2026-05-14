@@ -293,6 +293,87 @@ link:
     fi
     {{DOTFILES}}/install.sh
 
+# Pull origin/main, re-link, verify. Refuses outside canonical (inherits
+# `just link`'s guard via delegation). Refuses on detached HEAD, non-main
+# branch, dirty tree, or local-ahead-of-origin. Surfaces a banner when
+# the pulled range touches agent-policy surface (AGENTS.md / extensions /
+# Claude settings / hooks) so live agent sessions get a restart hint.
+# Surfaces a separate banner when the pulled range touches any
+# `ideas/batches/**/state.md` (signals concurrent multi-machine ledger
+# writes, flagged in JSK-49 for revisit).
+sync:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # Defensive: never inherit a pre-commit hook's git env. Not in JSK-44
+    # lint scope (no `git init` / `worktree add` / `clone` here), but cheap.
+    unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE GIT_OBJECT_DIRECTORY GIT_COMMON_DIR
+
+    canonical="$(dirname "$(git -C {{DOTFILES}} rev-parse --path-format=absolute --git-common-dir)")"
+    if [[ "{{DOTFILES}}" != "$canonical" ]]; then
+      printf "❌ just sync: refusing to run from a worktree (or outside canonical).\n" >&2
+      printf "   canonical = %s\n   DOTFILES  = %s\n" "$canonical" "{{DOTFILES}}" >&2
+      printf "   Switch: cd \"$canonical\" && just sync\n" >&2
+      exit 1
+    fi
+    cd "$canonical"
+
+    branch="$(git symbolic-ref --short HEAD 2>/dev/null || echo '(detached)')"
+    if [[ "$branch" != "main" ]]; then
+      printf "❌ just sync: HEAD is on '%s', expected 'main'. Switch first.\n" "$branch" >&2
+      exit 1
+    fi
+    if [[ -n "$(git status --porcelain)" ]]; then
+      printf "❌ just sync: working tree dirty — commit/stash first.\n" >&2
+      git status --short >&2
+      exit 1
+    fi
+    # Per-machine user identity must be present; missing ~/.gitconfig.local
+    # was the root cause of the May 13 canonical-config corruption (test
+    # fixture's git config writes landed in canonical when no local user
+    # was set). Fail loud before any pull.
+    if [[ -z "$(git config --get user.email 2>/dev/null)" ]]; then
+      printf "❌ just sync: git user.email unset. Create ~/.gitconfig.local first.\n" >&2
+      exit 1
+    fi
+
+    GIT_SSH_COMMAND='ssh -o ConnectTimeout=5 -o BatchMode=yes' git fetch --quiet origin main
+    behind="$(git rev-list --count main..origin/main 2>/dev/null || echo 0)"
+    ahead="$(git  rev-list --count origin/main..main 2>/dev/null || echo 0)"
+
+    if (( ahead > 0 && behind > 0 )); then
+      printf "❌ diverged: %d ahead, %d behind. Reconcile manually (rebase or merge).\n" "$ahead" "$behind" >&2
+      exit 1
+    fi
+    if (( ahead > 0 )); then
+      printf "⚠ %d commits ahead origin/main — push first, then re-run.\n" "$ahead" >&2
+      exit 1
+    fi
+    if (( behind == 0 )); then
+      printf "✓ already up to date\n"
+      just check
+      exit 0
+    fi
+
+    # Capture pulled paths before mutating; used by both banners below.
+    pulled="$(git log --name-only --pretty=format: main..origin/main | sort -u)"
+    git merge --ff-only origin/main
+
+    # Banner 1: agent rule surface changed — restart any live agent sessions.
+    if printf '%s\n' "$pulled" | grep -qE '^(pi/agent/(AGENTS\.md|extensions/)|claude/(CLAUDE\.md|settings\.json|agents/)|git/hooks/)'; then
+      printf "\n⚠ agent rule surface changed in pulled range — restart any running pi/Claude sessions before continuing.\n" >&2
+    fi
+    # Banner 2: ledger writes from another machine. Single-machine ledger
+    # is the documented assumption; concurrent writes trigger JSK-XX.
+    if printf '%s\n' "$pulled" | grep -qE '^ideas/batches/.*/state\.md$'; then
+      printf "\n⚠ ledger state changed in pulled range — indicates concurrent multi-machine batches.\n" >&2
+      printf "   Current ledger design assumes single-machine writes; revisit JSK-49 if this is happening regularly.\n" >&2
+    fi
+
+    # Delegate symlinking to `just link` so its worktree-refuse guard is
+    # the canonical entry point (rather than calling install.sh directly).
+    just link
+    just check
+
 # The manifest is the contract — see uninstall.sh's footer for the things
 # this does NOT touch (pnpm globals, Brewfile, tmux/claude plugins,
 # ~/.gitconfig.local, etc.). For a full Mac tear-down including brew +

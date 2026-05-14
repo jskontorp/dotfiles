@@ -422,6 +422,7 @@ rm -f ~/.config/zsh/sv-completion.zsh  # graveyarded 2026-05-12
 # Machine-specific zsh helpers
 if [[ "$MACHINE" == "mac" ]]; then
   _link "$DOTFILES/zsh/ssh-theme.zsh"  ~/.config/zsh/
+  _link "$DOTFILES/zsh/dotfiles-freshness.zsh" ~/.config/zsh/
 fi
 
 # --- Mac-only ---
