@@ -8,6 +8,18 @@
 
 declare module "@mariozechner/pi-coding-agent" {
   export type ExtensionAPI = any;
+  export const DEFAULT_MAX_BYTES: number;
+  export const DEFAULT_MAX_LINES: number;
+  export function formatSize(...args: any[]): any;
+  export function truncateHead(...args: any[]): any;
+}
+
+declare module "@mariozechner/pi-ai" {
+  export const StringEnum: any;
+}
+
+declare module "@mariozechner/pi-tui" {
+  export const Text: any;
 }
 
 declare module "@sinclair/typebox" {
@@ -40,3 +52,5 @@ declare const process: {
 declare const fetch: any;
 declare type AbortSignal = any;
 declare const AbortSignal: any;
+declare const URLSearchParams: any;
+declare type URLSearchParams = any;
