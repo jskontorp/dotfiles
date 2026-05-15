@@ -10,6 +10,12 @@
 #
 # Sources git/lib/silencing-gate.sh — the patterns themselves live in the
 # review-patterns.md catalogue, parsed at every invocation.
+#
+# Hook chain (JSK-43): pre-commit (secret-path gate, JSK-35) runs first and
+# aborts on refusal before this hook is consulted. To test a fix in
+# isolation without re-staging the secret-path bait, run this hook
+# standalone: `git/hooks/commit-msg path/to/COMMIT_EDITMSG`. Test:
+# test/check-hook-chain.sh.
 set -euo pipefail
 
 MSG_FILE="$1"

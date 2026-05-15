@@ -2,6 +2,12 @@
 # Pre-commit hook: shellcheck on staged .sh files + `just check` (justfile
 # parity, manifest integrity, bash portability).
 # Symlinked into .git/hooks/ by install.sh.
+#
+# Hook chain (JSK-43): this is the FIRST hook to run. The commit-msg hook
+# (silencing-gate, JSK-36) runs *after* this one returns 0. Commits that
+# would trip both gates only see this gate's refusal on the first attempt;
+# the silencing-gate refusal becomes visible on retry once the secret-path
+# issue is fixed. Test: test/check-hook-chain.sh.
 set -euo pipefail
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
