@@ -4,6 +4,7 @@ machine: Mac (canonical: `~/code/personal/dotfiles`)
 session: 2026-05-14 (multi-phase, spans /compact)
 umbrella: [JSK-52](https://linear.app/jskontorp-dev/issue/JSK-52/)
 closed: 2026-05-15 (JSK-43 landed f80f237; JSK-46 deferred to fresh session)
+review artefacts: `jsk-43-review/` (proposal + guided/blind reviews + synthesis)
 
 Ledger written retroactively mid-batch, between JSK-43 commit 1 and commit 2, after JSK-52 was filed and the "first real session-ledger use" was identified as item #5 in its concrete follow-ups. Going forward this file is the working memory; chat and `.pi-delegate/batch-N/` are scratch.
 
