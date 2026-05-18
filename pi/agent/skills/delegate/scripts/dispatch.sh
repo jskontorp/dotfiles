@@ -87,21 +87,45 @@ if $USE_TUI; then
   [ -n "$TASK_MODEL" ] && PANE_TITLE="$PANE_TITLE · $TASK_MODEL"
   tmux select-pane -t "$TMUX_PANE" -T "$PANE_TITLE" 2>/dev/null || true
 
+  # Background pi first so we can hand its PID to the watcher. The watcher
+  # SIGTERMs this PID on file-timeout / MAX_WAIT and touches a
+  # "${RESULT_FILE%.md}.watcher-killed" marker; we re-classify the resulting
+  # exit to 124 ("timeout") below so poll.sh sees consistent semantics with
+  # pre-fix behaviour (where the outer `timeout` fired and produced the
+  # same status).
+  #
+  # Note on PID semantics: when TIMEOUT_CMD is non-empty (the default), $!
+  # is the `timeout` wrapper's PID, not pi's. SIGTERM to `timeout` is
+  # forwarded to pi by coreutils — sufficient for the symptom we're fixing.
+  # If pi spawns long-lived children that survive their parent, those
+  # become orphans; not observed in this skill's workload, document if it
+  # appears.
+  "${TIMEOUT_CMD[@]}" "${PI_CMD[@]}" &
+  PI_PID=$!
+
   # Background watcher: detects turn completion in the session JSONL,
   # extracts the final assistant text into RESULT_FILE, and sends /quit
   # to this pane so pi exits and returns control to dispatch.sh. Pass
   # MAX_WAIT = TIMEOUT + 30 so the watcher can't outlive an externally
   # killed pi (would otherwise leave dispatch.sh blocked on `wait`).
   WATCHER_MAX_WAIT=$(( TIMEOUT > 0 ? TIMEOUT + 30 : 1800 ))
-  "$SCRIPT_DIR/watcher.sh" "$SESSION_DIR" "$RESULT_FILE" "$TMUX_PANE" 2 30 "$WATCHER_MAX_WAIT" &
+  "$SCRIPT_DIR/watcher.sh" "$SESSION_DIR" "$RESULT_FILE" "$TMUX_PANE" 2 30 "$WATCHER_MAX_WAIT" "$PI_PID" &
   WATCHER_PID=$!
 
-  # Run pi in TUI mode in the foreground (fills the pane).
   EXIT_CODE=0
-  "${TIMEOUT_CMD[@]}" "${PI_CMD[@]}" || EXIT_CODE=$?
+  wait "$PI_PID" || EXIT_CODE=$?
 
-  # Reap watcher (it should already have exited after sending /quit).
+  # Reap watcher (it should already have exited after sending /quit or
+  # killing pi).
   wait "$WATCHER_PID" 2>/dev/null || true
+
+  # If the watcher killed pi (file-timeout or MAX_WAIT), normalise the exit
+  # code to 124 so poll.sh classifies this as "timeout" — matches the
+  # pre-fix behaviour where the outer `timeout` fired with the same code.
+  KILLED_MARKER="${RESULT_FILE%.md}.watcher-killed"
+  if [ -f "$KILLED_MARKER" ]; then
+    EXIT_CODE=124
+  fi
 else
   # Tee output so a `tmux attach -t pi-delegate` pane shows live progress
   # while still capturing everything to the result file. Use PIPESTATUS so
