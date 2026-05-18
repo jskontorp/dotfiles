@@ -1,9 +1,15 @@
 # batch: delegate-tighten
 
 started: 2026-05-18
+closed: 2026-05-18
 branch: delegate-tighten
-ticket: (post-landing — defer per protocol)
+ticket: (filed post-landing)
 origin: odev:4.1 post-mortem (2026-05-18) → plan → double-review (batch-1, guided + blind)
+
+commits:
+- 582dbb7  feat(delegate): watcher kills pi on file-timeout / MAX_WAIT, dispatch maps to 124
+- 6169955  feat(delegate): tighten TUI gate — require attached client + min pane height
+- (this)   docs(delegate): document tightened gate, headless mode, 124 sentinel, poll alignment
 
 ## Standing Directives
 
@@ -34,10 +40,10 @@ Expected-failing / deferred: none.
 
 - [x] Spawn worktree (`./dev delegate-tighten`).
 - [x] Initialise ledger.
-- [ ] Commit A — watcher.sh + dispatch.sh restructure + tests/fixtures/pi-shim.sh + file-timeout-kills-pi.test.sh.
-- [ ] Commit B — TUI gate + tui-gate.test.sh + regression-odev-4-1.test.sh.
-- [ ] Commit C — SKILL.md doc.
-- [ ] Triple-review sibling-ticket decision (file or punt).
+- [x] Commit A — watcher.sh + dispatch.sh restructure + tests/fixtures/pi-shim.sh + file-timeout-kills-pi.test.sh (582dbb7).
+- [x] Commit B — TUI gate + tui-gate.test.sh + regression-odev-4-1.test.sh (6169955).
+- [x] Commit C — SKILL.md doc.
+- [ ] Triple-review sibling-ticket decision (file or punt) — punt unless interactive smoke surfaces a regression.
 - [ ] File primary ticket post-landing.
 - [ ] PR + merge.
 

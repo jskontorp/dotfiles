@@ -205,15 +205,28 @@ fi
 If a batch has >4 tasks, use additional windows — the same `has-session` +
 `batch-N` increment naturally produces them.
 
-Each pane runs `dispatch.sh`, which (when tmux **and** `jq` are present)
-launches the sub-agent in **pi TUI mode** — full live view of tool calls,
-thinking, and streamed output. A background watcher polls the session JSONL;
-when the assistant's last message reaches a terminal `stopReason`
+Each pane runs `dispatch.sh`, which (when tmux **and** `jq` are present,
+**and** the tmux session has an attached client, **and** the pane is at
+least `DELEGATE_MIN_PANE_HEIGHT` rows tall — default 20) launches the
+sub-agent in **pi TUI mode** — full live view of tool calls, thinking, and
+streamed output. A background watcher polls the session JSONL; when the
+assistant's last message reaches a terminal `stopReason`
 (`stop`/`length`/`error`/`aborted`) and no tool calls are pending, it
 extracts the final assistant text into `$RESULTS_DIR/${TASK_ID}.md` and
 sends `/quit` to the pane so pi shuts down cleanly. Sub-agent sessions
 persist under `$DELEGATE_DIR/sessions/${TASK_ID}/` for post-hoc inspection
 (`pi --resume` or `--export`).
+
+If any TUI precondition fails, dispatch falls through to the headless
+`pi -p` path (see "Headless orchestration" below). This gating was added
+after the odev:4.1 (2026-05-18) failure mode — a detached `pi-delegate`
+session with sub-20-row panes silently breaks pi's first-render, leaves
+the watcher with no JSONL to read, and hangs dispatch until the outer
+`timeout` fires. The gate trips pre-render and routes through headless
+instead. **Interactive caveat:** a user who runs delegate from a detached
+session and `tmux attach`es a few seconds later will still get headless
+for the whole run, because the gate is evaluated once at dispatch time.
+Attach **first**, then dispatch, for live TUI viewing.
 
 **RESULT_FILE shape differs by branch.** Headless (`pi -p | tee`) captures
 everything pi prints; TUI mode captures only the final assistant message's
@@ -221,7 +234,12 @@ text content (tool calls, thinking blocks, intermediate messages live in
 the session JSONL, not in `$RESULTS_DIR/${TASK_ID}.md`). For consumers
 that need the full transcript, read `$DELEGATE_DIR/sessions/${TASK_ID}/`.
 The watcher caps its wait at `TIMEOUT + 30s` so dispatch.sh's `wait` never
-hangs on an externally killed pi.
+hangs on an externally killed pi. If the watcher gives up (no session
+file within 30s, or no terminal stopReason within `TIMEOUT + 30s`), it
+SIGTERMs the pi process and touches a `.watcher-killed` marker that
+dispatch.sh translates into exit code `124` — the same code poll.sh would
+have seen had the outer `timeout` fired, so the status classification
+(`"timeout"`) is consistent across both paths.
 
 Tell the user, printing both names explicitly (no claim of equality):
 
@@ -241,6 +259,40 @@ for each task in batch:
 done
 wait
 ```
+
+### Headless orchestration (CI / VM / no human attaching)
+
+When the orchestrator is running somewhere no human will attach to the
+`pi-delegate` tmux session — CI, a VM driven over SSH, a batch job, the
+parent agent's own non-interactive shell — skip the tmux session entirely
+and background dispatch directly:
+
+```bash
+for i in $(seq 1 N); do
+  TASK_ID="task-$i"
+  PROMPT_FILE="$BATCH_DIR/${TASK_ID}-prompt.txt"
+  "$SKILL_DIR/scripts/dispatch.sh" "$TASK_ID" "$TASK_DIR" "$TIMEOUT" "$PROMPT_FILE" "$RESULTS_DIR" "" "" >/dev/null 2>&1 &
+done
+# (poll.sh below)
+```
+
+If `TMUX_PANE` is set in the parent shell (e.g. you're inside a tmux
+pane but want headless mode anyway), the TUI gate will refuse TUI mode
+automatically when the pane geometry or attached-client check fails —
+you don't need to `unset TMUX_PANE`. The gate is the contract; explicit
+`unset` is no longer necessary.
+
+Align `poll.sh`'s `MAX_WAIT` with the per-task timeout instead of using a
+flat budget. The per-task `TIMEOUT` is the longest a single task can
+run; tasks run in parallel, so `MAX_WAIT = TIMEOUT + 60s` slack covers
+the slowest task plus dispatch.sh's post-wait bookkeeping:
+
+```bash
+"$SKILL_DIR/scripts/poll.sh" "$RESULTS_DIR" "$STATUS_FILE" "$TASK_IDS" 5 $(( TIMEOUT + 60 ))
+```
+
+This is the pattern used as the recovery path on the odev:4.1 failure —
+it's now the documented mode, not a workaround.
 
 ### Prompt files
 
