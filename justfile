@@ -12,7 +12,7 @@ GLOBAL_PNPM := "@anthropic-ai/claude-code @mariozechner/pi-coding-agent pyright 
 
 # Tools that both platforms must report in `just status`.
 # Platform-specific tools (brew, fnm, docker, etc.) are added per-recipe.
-SHARED_STATUS_TOOLS := "zsh nvim tmux node pnpm git gh delta starship eza bat rg fzf zoxide lazygit pi claude"
+SHARED_STATUS_TOOLS := "zsh nvim tmux node pnpm git gh delta starship eza bat rg fzf zoxide lazygit glow pi claude"
 
 # --- Setup ---
 
@@ -129,6 +129,11 @@ update:
       "https://github.com/jesseduffield/lazygit/releases/download/v${LAZYGIT_VERSION}/lazygit_${LAZYGIT_VERSION}_Linux_arm64.tar.gz" \
       lazygit
 
+    GLOW_VERSION=$(curl -s https://api.github.com/repos/charmbracelet/glow/releases/latest | grep tag_name | cut -d'"' -f4 | sed 's/^v//')
+    _fetch_binary glow \
+      "https://github.com/charmbracelet/glow/releases/download/v${GLOW_VERSION}/glow_${GLOW_VERSION}_Linux_arm64.tar.gz" \
+      glow 1
+
     _install zoxide
     curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh
 
@@ -231,6 +236,7 @@ status:
     printf "%-12s %s\n" "fd"       "$(fd --version | awk '{print $2}')"
     printf "%-12s %s\n" "zoxide"   "$(zoxide --version 2>/dev/null | awk '{print $2}' || echo 'missing')"
     printf "%-12s %s\n" "lazygit"  "$(lazygit --version | head -1 | sed 's/.*version=//' | cut -d, -f1)"
+    printf "%-12s %s\n" "glow"     "$(glow --version 2>/dev/null | awk '{print $3}' || echo 'missing')"
     printf "%-12s %s\n" "pi"       "$(command -v pi &>/dev/null && pi --version 2>&1 | awk '{print $NF}' || echo 'missing')"
     printf "%-12s %s\n" "claude"   "$(command -v claude &>/dev/null && claude --version 2>&1 | awk '{print $1}' || echo 'missing')"
 
@@ -260,6 +266,7 @@ status:
     printf "%-12s %s\n" "fzf"      "$(fzf --version | awk '{print $1}')"
     printf "%-12s %s\n" "zoxide"   "$(zoxide --version 2>/dev/null | awk '{print $2}' || echo 'missing')"
     printf "%-12s %s\n" "lazygit"  "$(lazygit --version | head -1 | sed 's/.*version=//' | cut -d, -f1)"
+    printf "%-12s %s\n" "glow"     "$(glow --version 2>/dev/null | awk '{print $3}' || echo 'missing')"
     printf "%-12s %s\n" "fnm"      "$(fnm --version 2>/dev/null | awk '{print $2}' || echo 'missing')"
     printf "%-12s %s\n" "just"     "$(just --version 2>/dev/null | awk '{print $2}' || echo 'missing')"
     printf "%-12s %s\n" "docker"   "$(docker --version 2>/dev/null | awk '{print $3}' | tr -d ',' || echo 'missing')"

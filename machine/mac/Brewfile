@@ -14,6 +14,7 @@ brew "git-delta"       # diff pager
 brew "zoxide"          # smart cd
 brew "fzf"             # fuzzy finder
 brew "lazygit"         # git TUI
+brew "glow"            # markdown renderer for terminal
 
 # Shell
 brew "starship"        # prompt
