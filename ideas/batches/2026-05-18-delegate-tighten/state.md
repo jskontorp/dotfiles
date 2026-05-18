@@ -7,9 +7,9 @@ ticket: (filed post-landing)
 origin: odev:4.1 post-mortem (2026-05-18) → plan → double-review (batch-1, guided + blind)
 
 commits:
-- 582dbb7  feat(delegate): watcher kills pi on file-timeout / MAX_WAIT, dispatch maps to 124
-- 6169955  feat(delegate): tighten TUI gate — require attached client + min pane height
-- (this)   docs(delegate): document tightened gate, headless mode, 124 sentinel, poll alignment
+- 95009cb  feat(delegate): watcher kills pi on file-timeout / MAX_WAIT, dispatch maps to 124
+- f158838  feat(delegate): tighten TUI gate — require attached client + min pane height
+- 015855c  docs(delegate): document tightened TUI gate, headless mode, 124 sentinel
 
 ## Standing Directives
 
@@ -40,8 +40,8 @@ Expected-failing / deferred: none.
 
 - [x] Spawn worktree (`./dev delegate-tighten`).
 - [x] Initialise ledger.
-- [x] Commit A — watcher.sh + dispatch.sh restructure + tests/fixtures/pi-shim.sh + file-timeout-kills-pi.test.sh (582dbb7).
-- [x] Commit B — TUI gate + tui-gate.test.sh + regression-odev-4-1.test.sh (6169955).
+- [x] Commit A — watcher.sh + dispatch.sh restructure + tests/fixtures/pi-shim.sh + file-timeout-kills-pi.test.sh (95009cb).
+- [x] Commit B — TUI gate + tui-gate.test.sh + regression-odev-4-1.test.sh (f158838).
 - [x] Commit C — SKILL.md doc.
 - [ ] Triple-review sibling-ticket decision (file or punt) — punt unless interactive smoke surfaces a regression.
 - [ ] File primary ticket post-landing.
