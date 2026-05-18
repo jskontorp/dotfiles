@@ -29,11 +29,28 @@ fi
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"; pkill -P $$ 2>/dev/null || true' EXIT
 
-# Prepend a per-test PATH with a `pi` symlink → pi-shim.sh.
+# Prepend a per-test PATH with `pi` → pi-shim.sh and a `tmux` stub that
+# satisfies the TUI gate (session_attached=1, pane_height=24). Other tmux
+# calls in dispatch.sh / watcher.sh are guarded with `|| true`; the stub
+# returns 0 for them.
 BIN="$TMP/bin"
 mkdir -p "$BIN"
 ln -s "$SHIM_DIR/pi-shim.sh" "$BIN/pi"
 chmod +x "$SHIM_DIR/pi-shim.sh"
+
+cat > "$BIN/tmux" <<'TMUXSTUB'
+#!/usr/bin/env bash
+if [ "${1:-}" = "display" ] && [ "${2:-}" = "-p" ]; then
+  fmt="${5:-}"
+  case "$fmt" in
+    '#{session_attached}') echo 1;  exit 0 ;;
+    '#{pane_height}')      echo 24; exit 0 ;;
+  esac
+fi
+exit 0
+TMUXSTUB
+chmod +x "$BIN/tmux"
+
 export PATH="$BIN:$PATH"
 
 passed=0

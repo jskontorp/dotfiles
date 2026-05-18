@@ -50,15 +50,29 @@ if [ "$TIMEOUT" -gt 0 ] 2>/dev/null; then
   fi
 fi
 
-# Build pi command. In tmux + with jq available, run pi in TUI mode so the
-# pane shows the live agent (tool calls, thinking, streamed output). A
-# background watcher polls the session JSONL for turn completion, extracts
-# the final assistant text into RESULT_FILE, and sends "/quit" to the pane
-# so pi exits cleanly. Outside tmux (sequential fallback), or when jq is
-# missing, fall back to `pi -p` so the existing capture path still works.
+# Build pi command. In tmux + with jq available + a viable pane geometry,
+# run pi in TUI mode so the pane shows the live agent (tool calls, thinking,
+# streamed output). A background watcher polls the session JSONL for turn
+# completion, extracts the final assistant text into RESULT_FILE, and sends
+# "/quit" to the pane so pi exits cleanly. Outside tmux (sequential
+# fallback), when jq is missing, OR when the pane isn't viable for the TUI
+# (detached session, sub-minimum height), fall back to `pi -p` so the
+# existing capture path still works.
+#
+# Viability gate added 2026-05-18 after odev:4.1: detached `pi-delegate`
+# sessions with sub-20-row panes silently break pi's TUI first-render, so
+# the watcher never sees a session file and dispatch hangs. The gate trips
+# pre-render and routes through headless instead. DELEGATE_MIN_PANE_HEIGHT
+# is overridable but the 20-row default reflects observed first-render
+# behaviour; lower at your own risk.
 USE_TUI=false
 if [ -n "${TMUX_PANE:-}" ] && command -v jq >/dev/null 2>&1; then
-  USE_TUI=true
+  ATTACHED=$(tmux display -p -t "$TMUX_PANE" '#{session_attached}' 2>/dev/null || echo 0)
+  HEIGHT=$(tmux display -p -t "$TMUX_PANE" '#{pane_height}' 2>/dev/null || echo 0)
+  MIN_HEIGHT="${DELEGATE_MIN_PANE_HEIGHT:-20}"
+  if [ "${ATTACHED:-0}" -gt 0 ] 2>/dev/null && [ "${HEIGHT:-0}" -ge "$MIN_HEIGHT" ] 2>/dev/null; then
+    USE_TUI=true
+  fi
 fi
 
 PI_CMD=(pi)
