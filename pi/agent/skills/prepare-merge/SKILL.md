@@ -5,12 +5,14 @@ description: >-
   Use when the user explicitly says "prepare merge", "prepare for merge", or "ready to merge".
   Do NOT use for general code reviews or uncommitted change reviews.
 compatibility: Requires git, gh
-allowed-tools: Bash(git:*) Bash(gh:*) Bash(rg:*) Read Edit
+allowed-tools: Bash(git:*) Bash(gh:*) Bash(rg:*) Bash(curl:*) linear_issue Read Edit
 ---
 
 # Prepare Merge
 
 Catch everything an automated reviewer would flag — in one pass, before pushing.
+
+> **Relationship to `review-pr`.** Phases 0–4 of this skill are identical to the read-only peer-review skill `review-pr`. The only divergence is Phase 5 (apply fixes, resolve threads, `gh pr ready`). If you only want a read-only review, use `review-pr` instead.
 
 ## Preamble
 
@@ -49,6 +51,31 @@ Fetch inline review comments and top-level review bodies via `gh api`. Also fetc
 
 Actionable comments appear in the Phase 4 report under **PR Review Feedback** before the agent's own findings. If a reviewer comment and a Phase 2/3 finding overlap, keep one entry and attribute both sources.
 
+## Phase 0.7 — Invariant extraction
+
+Before reading the code, extract the contracts the PR *claims* to uphold. LLM reviewers pattern-match on present code and miss issues that live in what isn't there; an explicit contract list anchors the negative-space probe in Phase 2.5 and the architectural review in Phase 3.
+
+Read, in order:
+
+1. **PR description** — `gh pr view --json body --jq '.body'`.
+2. **Linked Linear / Jira issue** — if a URL appears in the PR body, best-effort fetch (`linear_issue` tool, `gh api`, or `curl`). Skip on failure; don't block the review.
+3. **In-repo spec** — glob for the feature name from the PR title: `docs/superpowers/specs/*.md`, `docs/specs/*.md`, `specs/*.md`. Read any match.
+
+From these sources, extract a bulleted list of the **contracts the code claims**. A contract is a falsifiable statement about runtime behaviour. Examples of contract shapes:
+
+- "every persisted item has ≥1 source"
+- "audit/notes fields survive persistence"
+- "first-run-empty state is distinguishable from never-extracted"
+- "endpoint X rejects resources of type Y"
+- "items sharing key K must agree on classification field F"
+- "field F, declared non-empty in the description, is validated at construction time"
+
+Surface the list under **`### Contracts asserted by this PR`** in the Phase 4 report. If nothing surfaces, state it explicitly:
+
+> Contracts asserted: none surfaced — review proceeds without contract anchor.
+
+Do not fabricate contracts. The list anchors Phase 2.5 and Phase 3 — if it is empty, those phases still run, just without a precomputed checklist.
+
 ## Phase 1 — Gather
 
 ```bash
@@ -68,6 +95,56 @@ Check every changed file for:
 | **Dead code & debug artifacts** | Unused imports/vars, commented-out blocks, unreachable branches, `console.log/debug`, `debugger`, `// TODO: remove`, `// HACK` |
 | **Error handling** | Empty catch, swallowed errors, API routes without try/catch |
 | **Security** | Missing auth checks, unsanitized input |
+
+## Phase 2.5 — Negative-space probe
+
+The class of bug that line-level review misses is the bug that is not on the page: a field computed and discarded, an unwritten row, an asymmetric guard, an unenforced invariant. LLM reviewers pattern-match on present code; they don't enumerate absences unless forced.
+
+Each sub-pass below is **enumerate first, judge second**. Write the full list before opining on any item. An empty list is a valid result and should be stated as such.
+
+Use the contracts from Phase 0.7 as priors — if a contract is asserted, the relevant sub-pass must explicitly confirm or refute that the code enforces it.
+
+### (a) Response-field traceability
+
+- Enumerate every field **added or modified** on a public response model in the diff.
+- Enumerate every field **added** on internal return types / dataclasses / Pydantic schemas in the diff.
+- For each enumerated field, trace where it is **populated** (writers) and where it is **consumed** (readers / serializers / persisters).
+- Flag any field that is: declared-but-never-written, written-but-never-read, or computed-but-discarded between the producing function and the persistence / response boundary.
+
+### (b) Persistence input enumeration
+
+For every persistence path touched in this PR (repository write, raw `INSERT`, upsert, archive, soft-delete), enumerate input shapes explicitly:
+
+- **Empty input** — zero items.
+- **Single-item input.**
+- **Conflicting-key input** — two incoming records share the dedup / primary key but disagree on a non-key field (classification, type, metadata).
+- **Retry-after-partial input** — same call shape repeated after a partial earlier write.
+
+For each shape, state the post-state. Is it **representable** (distinct row exists or its absence is itself meaningful)? **Distinguishable** from neighbouring states (e.g. "first-run produced empty result" vs. "never run")? **Correct** (no silent loss, no last-write-wins where the spec requires reconciliation)?
+
+### (c) Endpoint symmetry
+
+For every resource type touched by an endpoint in this PR:
+
+- List **every handler** (GET/POST/PUT/DELETE/PATCH) on that resource across the codebase (`rg` by route prefix or resource name).
+- Diff the precondition guards on each: authentication, authorization, resource-type check, ownership / tenant scoping, lifecycle state.
+- Flag asymmetries (e.g. POST validates resource type, GET does not; PUT checks ownership, DELETE does not).
+
+### (d) Pydantic / schema contract enforcement
+
+For every `Field(default_factory=list|dict)` (or analogous defaulted collection field) in the diff:
+
+- Read the field's `description=` text.
+- If the description claims any constraint — "at least one", "non-empty", "required for persisted items", "must include …" — check that a validator (`@field_validator`, `@model_validator`, repository-side guard) enforces it at the relevant boundary.
+- Flag drift between the description (human-readable contract) and runtime enforcement.
+
+### (e) Test-the-test
+
+For each test added or modified in the diff:
+
+- Enumerate scenarios it does **not** cover for the function under test: empty input, conflict / collision, error path, non-default-language / non-default-tenant. Flag gaps that intersect contracts from Phase 0.7.
+- If the test patches or mocks N functions in a module, count how many functions of that role exist in the module. Flag if N < total — invisible code is untested code.
+- Does any test construct domain objects that bypass validators or invariants (e.g. building a model with `model_construct`, or instantiating a dataclass with values a validator would reject)? Flag — the test is exercising an unrepresentable state.
 
 ## Phase 3 — Architectural Review
 
@@ -104,6 +181,11 @@ Otherwise, present one combined report, then **stop and wait for approval**:
 ```
 ## Pre-Merge Review: `branch-name`
 X commits, Y files — 🔴 N must-fix · 🟡 M should-fix · ⚪ P nits
+
+### Contracts asserted by this PR
+- every persisted item has ≥1 source (from spec §3)
+- audit/notes fields survive persistence (from PR description)
+- (or: `Contracts asserted: none surfaced — review proceeds without contract anchor.`)
 
 ### PR Review Feedback  ← only if a PR with comments exists
 - 🔴 @reviewer `file.ts` (L42): "missing null check on ..." → **actionable**, not yet addressed
