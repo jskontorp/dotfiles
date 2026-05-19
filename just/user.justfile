@@ -5,6 +5,11 @@
 
 set shell := ["bash", "-uc"]
 
+# Canonical dotfiles path — resolved from this justfile's symlink target so
+# `gust link` / `check` / `skills` work regardless of where dotfiles is
+# checked out on the host (mac vs vm).
+DOTFILES := `dirname "$(dirname "$(realpath ~/.config/just/justfile)")"`
+
 # List available recipes (default).
 default:
     @just --justfile {{justfile()}} --list
@@ -22,15 +27,15 @@ dev:
 
 # Re-run dotfiles install (idempotent).
 link:
-    cd ~/code/personal/dotfiles && ./install.sh
+    cd {{DOTFILES}} && ./install.sh
 
 # Run the dotfiles host-side check suite.
 check:
-    cd ~/code/personal/dotfiles && just check
+    cd {{DOTFILES}} && just check
 
 # Show the unified skills inventory.
 skills:
-    cd ~/code/personal/dotfiles && just skills
+    cd {{DOTFILES}} && just skills
 
 # Update brew + pnpm globals (mac).
 update:

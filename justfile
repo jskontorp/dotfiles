@@ -285,7 +285,8 @@ status:
 # only valid linking source. The cascade: every recipe that auto-runs
 # `just link` (new-skill / edit-skill / add-skill / update-skill, JSK-37)
 # inherits this refusal — skill-mutation must happen from canonical. The fix
-# is a one-liner: `cd ~/code/personal/dotfiles && just <recipe>`.
+# is a one-liner: `cd "$canonical" && just <recipe>` (or `gust link`,
+# which resolves canonical dynamically).
 #
 # Symlink all configs (refuses from a worktree; canonical-only).
 link:

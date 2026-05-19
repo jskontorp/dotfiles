@@ -3,9 +3,11 @@
 #
 # Usage: ./dev <slug>
 #
-# Creates ~/code/personal/dotfiles_worktrees/<slug> on a new branch from main,
-# opens a tmux window <slug> in the `dotfiles` session, hands you a shell.
-# Idempotent: re-running with the same slug selects the existing window.
+# Creates <canonical-parent>/<canonical-basename>_worktrees/<slug> on a new
+# branch from main, opens a tmux window <slug> in the `dotfiles` session,
+# hands you a shell. Idempotent: re-running with the same slug selects the
+# existing window. Canonical location resolved from this script's own path,
+# so the script works regardless of where dotfiles is checked out.
 #
 # Constraints (deliberate, do not relax without re-reading AGENTS.md):
 # - Run from canonical dotfiles only. Refuses elsewhere.
@@ -27,14 +29,28 @@ for tool in tmux git; do
   command -v "$tool" >/dev/null 2>&1 || { echo "❌ required tool not on PATH: $tool" >&2; exit 66; }
 done
 
-# Resolve canonical via pwd -P so a symlinked ~/code (e.g. external volume)
-# doesn't false-reject the cwd check below.
-CANONICAL="$(cd "$HOME/code/personal/dotfiles" 2>/dev/null && pwd -P)" || {
-  echo "❌ canonical dotfiles not found at \$HOME/code/personal/dotfiles" >&2
+# Resolve canonical from this script's own location via pwd -P (matches
+# install.sh:8 style; avoids realpath portability issues per AGENTS.md
+# regression classes). Refuse if invoked from a worktree by comparing
+# script dir against git-common-dir's parent.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+if git -C "$SCRIPT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  canonical_repo="$(dirname "$(git -C "$SCRIPT_DIR" rev-parse --path-format=absolute --git-common-dir)")"
+  if [[ "$SCRIPT_DIR" != "$canonical_repo" ]]; then
+    echo "❌ ./dev must be run from canonical dotfiles ($canonical_repo)" >&2
+    echo "   got: $SCRIPT_DIR" >&2
+    exit 65
+  fi
+else
+  echo "❌ ./dev: $SCRIPT_DIR is not inside a git work tree" >&2
   exit 67
-}
+fi
+CANONICAL="$SCRIPT_DIR"
 SESSION="dotfiles"
-WT_BASE="$HOME/code/personal/dotfiles_worktrees"
+# Worktrees sit next to canonical: <parent>/<basename>_worktrees/<slug>.
+# Matches the convention used at ~/code/personal/dotfiles_worktrees on mac
+# and /home/ubuntu/dotfiles_worktrees on the VM.
+WT_BASE="$(dirname "$CANONICAL")/$(basename "$CANONICAL")_worktrees"
 
 usage() {
   cat >&2 <<EOF
@@ -51,15 +67,6 @@ SLUG="$1"
 [[ "$SLUG" =~ ^[a-z0-9][a-z0-9-]*$ ]] || {
   echo "❌ slug must match [a-z0-9][a-z0-9-]* — got: '$SLUG'" >&2
   exit 64
-}
-
-# Refuse outside canonical. Resolve via pwd -P (matches install.sh:8 style;
-# avoids realpath portability issues per AGENTS.md regression classes).
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-[[ "$SCRIPT_DIR" == "$CANONICAL" ]] || {
-  echo "❌ ./dev must be run from canonical dotfiles ($CANONICAL)" >&2
-  echo "   got: $SCRIPT_DIR" >&2
-  exit 65
 }
 
 WT="$WT_BASE/$SLUG"
