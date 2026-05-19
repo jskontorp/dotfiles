@@ -12,7 +12,7 @@ Success criterion: five weekdays in a row where at least one exchange saves mean
 
 ### Runtime / agent
 
-- **Use pi (`@mariozechner/pi-coding-agent`) SDK, not Claude Code headless.**
+- **Use pi (`@earendil-works/pi-coding-agent`) SDK, not Claude Code headless.**
   - Reason: user already operates pi daily; OpenClaw uses the same embedded-SDK pattern in a messaging gateway; avoids per-message subprocess spawn cost; free credits via GitHub Copilot subscription (billed via Azure) cover model usage.
 - **Model: `github-copilot` / `claude-opus-4.7`.** Same provider serving the orchestrator right now; proven. No override.
 - **Architecture shape: Node process, pi SDK embedded in-process via `createAgentSession`.** Not subprocess-per-message, not RPC.

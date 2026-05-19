@@ -72,14 +72,12 @@ case "$(uname -s)" in
   Linux)  export PNPM_HOME="$HOME/.local/share/pnpm" ;;
 esac
 if [[ -n "${PNPM_HOME:-}" ]]; then
-  case ":$PATH:" in
-    *":$PNPM_HOME/bin:"*) ;;
-    *) export PATH="$PNPM_HOME/bin:$PATH" ;;
-  esac
-  case ":$PATH:" in
-    *":$PNPM_HOME:"*) ;;
-    *) export PATH="$PATH:$PNPM_HOME" ;;
-  esac
+  # Re-source-safe order normalisation: remove existing entries first so
+  # long-lived shells that still have legacy ordering are corrected too.
+  path=("${(@)path:#$PNPM_HOME/bin}")
+  path=("${(@)path:#$PNPM_HOME}")
+  path=("$PNPM_HOME/bin" "${path[@]}" "$PNPM_HOME")
+  export PATH="${(j/:/)path}"
 fi
 
 # libpq (keg-only) — psql/pg_dump client tools without the full server
