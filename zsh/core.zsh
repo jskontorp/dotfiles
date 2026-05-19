@@ -64,7 +64,8 @@ esac
 # `pnpm` itself at $PNPM_HOME/pnpm, and pre-pnpm-10 shims (e.g. `pi`,
 # `claude` installed before the migration) may still live at the legacy
 # location. Keep both on PATH so fresh shells resolve every binary
-# regardless of when it was installed. Mirrors `justfile` [linux] update.
+# regardless of when it was installed, but keep `$PNPM_HOME/bin` ahead so
+# modern shims win. Matches the same intent as `justfile` [linux] update.
 # Idempotent.
 case "$(uname -s)" in
   Darwin) export PNPM_HOME="$HOME/Library/pnpm" ;;
@@ -77,7 +78,7 @@ if [[ -n "${PNPM_HOME:-}" ]]; then
   esac
   case ":$PATH:" in
     *":$PNPM_HOME:"*) ;;
-    *) export PATH="$PNPM_HOME:$PATH" ;;
+    *) export PATH="$PATH:$PNPM_HOME" ;;
   esac
 fi
 

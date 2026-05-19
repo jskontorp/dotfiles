@@ -8,7 +8,7 @@ MAC      := DOTFILES / "machine/mac"
 VM       := DOTFILES / "machine/vm"
 
 # Global pnpm packages — shared across mac and vm update recipes
-GLOBAL_PNPM := "@anthropic-ai/claude-code @mariozechner/pi-coding-agent pyright typescript"
+GLOBAL_PNPM := "@anthropic-ai/claude-code @earendil-works/pi-coding-agent pyright typescript"
 
 # Tools that both platforms must report in `just status`.
 # Platform-specific tools (brew, fnm, docker, etc.) are added per-recipe.
@@ -42,6 +42,8 @@ update:
     export PNPM_HOME="$HOME/Library/pnpm"
     export PATH="$PNPM_HOME/bin:$PATH"
     mkdir -p "$PNPM_HOME/bin"
+    # Legacy package scope was renamed; remove old name if present.
+    pnpm rm -g @mariozechner/pi-coding-agent >/dev/null 2>&1 || true
     pnpm add -g {{GLOBAL_PNPM}}
 
     # Ensure Claude Code's native binary is present (see VM recipe for rationale).
@@ -178,13 +180,15 @@ update:
     _install pnpm
     # The standalone installer drops the `pnpm` binary at $PNPM_HOME/pnpm,
     # while pnpm ≥10 places globally-added shims under $PNPM_HOME/bin
-    # (older pnpm used $PNPM_HOME for both). Put both on PATH so the
-    # post-install global-add step resolves on a fresh VM bootstrap.
+    # (older pnpm used $PNPM_HOME for both). Keep both on PATH, but prefer
+    # $PNPM_HOME/bin so modern shims win when legacy shims still exist.
     export PNPM_HOME="$HOME/.local/share/pnpm"
-    export PATH="$PNPM_HOME:$PNPM_HOME/bin:$PATH"
+    export PATH="$PNPM_HOME/bin:$PNPM_HOME:$PATH"
     mkdir -p "$PNPM_HOME/bin"
     curl -fsSL https://get.pnpm.io/install.sh | SHELL=/bin/bash sh -
     echo "📦 global pnpm packages..."
+    # Legacy package scope was renamed; remove old name if present.
+    pnpm rm -g @mariozechner/pi-coding-agent >/dev/null 2>&1 || true
     pnpm add -g {{GLOBAL_PNPM}}
 
     # Claude Code ships a native binary via a postinstall script (install.cjs).

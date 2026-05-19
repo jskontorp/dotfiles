@@ -109,7 +109,7 @@ if [[ "$(uname -s)" == "Darwin" ]]; then
                             #   launchctl bootout gui/$(id -u)/com.volve.memory-sync
                             #   rm ~/Library/LaunchAgents/com.volve.memory-sync.plist
     ~/Library/pnpm/         # pnpm runtime + global packages
-    Global pnpm packages: pnpm rm -g @anthropic-ai/claude-code @mariozechner/pi-coding-agent pyright typescript
+    Global pnpm packages: pnpm rm -g @anthropic-ai/claude-code @earendil-works/pi-coding-agent @mariozechner/pi-coding-agent pyright typescript
     Brewfile packages:    brew bundle --file=machine/mac/Brewfile cleanup --force
 EOF
 else
@@ -123,7 +123,7 @@ else
     /usr/local/bin/{nvim,bat,eza,delta,lazygit,tmux,fd,batcat}
                                        # sudo-installed binaries from just update
     /opt/nvim/                         # nvim payload (sudo)
-    Global pnpm packages: pnpm rm -g @anthropic-ai/claude-code @mariozechner/pi-coding-agent pyright typescript
+    Global pnpm packages: pnpm rm -g @anthropic-ai/claude-code @earendil-works/pi-coding-agent @mariozechner/pi-coding-agent pyright typescript
     apt packages: see machine/vm/update — common system tools, recommend keeping
 EOF
 fi

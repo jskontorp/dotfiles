@@ -18,7 +18,7 @@
 //   until the user picks the action label / revise / cancel. Reads and the
 //   notion_mcp_* management tools pass through untouched.
 
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 const READ_TOOLS = new Set([
 	"notion-search",

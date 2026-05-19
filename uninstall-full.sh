@@ -53,6 +53,7 @@ This will:
   • uninstall every formula and cask listed in machine/mac/Brewfile
     (22 CLI tools + ghostty + orbstack); manual brew installs are kept
   • remove pnpm globals: @anthropic-ai/claude-code,
+    @earendil-works/pi-coding-agent,
     @mariozechner/pi-coding-agent, pyright, typescript
   • delete plugin/cache/runtime dirs under ~/.tmux, ~/.claude,
     ~/.local/share, ~/Library/pnpm, ~/.orbstack,
@@ -111,6 +112,7 @@ if command -v pnpm >/dev/null 2>&1; then
   # gone packages on some pnpm versions, hence || true.
   pnpm rm -g \
     @anthropic-ai/claude-code \
+    @earendil-works/pi-coding-agent \
     @mariozechner/pi-coding-agent \
     pyright \
     typescript 2>/dev/null || true

@@ -22,7 +22,7 @@
 // (linear-routing.ts, notion-routing.ts) or live outside the bash surface;
 // gating them here would create false positives on routine reads.
 
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 type Pattern = {
 	id: string;

@@ -23,7 +23,7 @@
 //     environment for the pi invocation. Without it, a non-interactive read
 //     of a secret path hard-blocks.
 
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 // Patterns mirror SECRET_GATE_PATTERNS in git/lib/secret-gate.sh. Each entry
 // is { id, re } where `id` shows up in the prompt and `re` matches the path.

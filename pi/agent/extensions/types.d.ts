@@ -6,7 +6,7 @@
 // the upstream packages and the extensions are loaded by pi at runtime, not
 // type-checked against the real signatures here.
 
-declare module "@mariozechner/pi-coding-agent" {
+declare module "@earendil-works/pi-coding-agent" {
   export type ExtensionAPI = any;
   export const DEFAULT_MAX_BYTES: number;
   export const DEFAULT_MAX_LINES: number;
@@ -14,11 +14,11 @@ declare module "@mariozechner/pi-coding-agent" {
   export function truncateHead(...args: any[]): any;
 }
 
-declare module "@mariozechner/pi-ai" {
+declare module "@earendil-works/pi-ai" {
   export const StringEnum: any;
 }
 
-declare module "@mariozechner/pi-tui" {
+declare module "@earendil-works/pi-tui" {
   export const Text: any;
 }
 

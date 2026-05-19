@@ -13,8 +13,8 @@
  * To change the describer model, edit the constants below.
  */
 
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { completeSimple, type Context, type UserMessage } from "@mariozechner/pi-ai";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { completeSimple, type Context, type UserMessage } from "@earendil-works/pi-ai";
 import { Type } from "@sinclair/typebox";
 import { readFile, stat } from "node:fs/promises";
 import { extname, isAbsolute, resolve } from "node:path";

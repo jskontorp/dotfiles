@@ -31,7 +31,7 @@
 //   LINEAR_PERSONAL_API_KEY=lin_api_xxx
 //   LINEAR_VOLVE_API_KEY=lin_api_yyy
 
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
