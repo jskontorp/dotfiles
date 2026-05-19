@@ -88,6 +88,23 @@ else
         printf "  ❌ explicit dir arg: got %s, expected %s\n" "$got" "$CANONICAL_EXPECTED" >&2
         errors=$((errors + 1))
     fi
+
+    # install.sh must refuse from a non-canonical worktree (hardening fix #1).
+    # Copy the install.sh under test into the detached worktree so this check
+    # sees uncommitted edits when run pre-commit.
+    cp "$REPO_DIR/install.sh" "$TMP_WT/install.sh"
+    install_err="$(mktemp -t jsk-install-guard.XXXXXX)"
+    if (cd "$TMP_WT" && ./install.sh >"$install_err" 2>&1); then
+        printf "  ❌ install.sh guard: expected refusal from worktree, but command succeeded\n" >&2
+        errors=$((errors + 1))
+    elif grep -q 'install.sh: refusing to run from a git worktree' "$install_err"; then
+        printf "  ✅ install.sh guard: worktree run refused\n"
+    else
+        printf "  ❌ install.sh guard: refusal message missing/unexpected\n" >&2
+        sed 's/^/     /' "$install_err" >&2
+        errors=$((errors + 1))
+    fi
+    rm -f "$install_err"
 fi
 
 # --- Case 3: core.hooksPath warning ----------------------------------------

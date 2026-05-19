@@ -6,6 +6,23 @@
 set -euo pipefail
 
 DOTFILES="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Refuse linking from a non-canonical git worktree. Running install.sh from a
+# worktree repoints every managed symlink at that ephemeral path, which breaks
+# as soon as the worktree is removed.
+if git -C "$DOTFILES" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  canonical_repo="$(dirname "$(git -C "$DOTFILES" rev-parse --path-format=absolute --git-common-dir)")"
+  dotfiles_real="$(cd "$DOTFILES" && pwd -P)"
+  canonical_real="$(cd "$canonical_repo" && pwd -P)"
+  if [[ "$dotfiles_real" != "$canonical_real" ]]; then
+    printf "❌ install.sh: refusing to run from a git worktree.\n" >&2
+    printf "   script path = %s\n" "$dotfiles_real" >&2
+    printf "   canonical   = %s\n" "$canonical_real" >&2
+    printf "   Run from canonical: cd \"%s\" && ./install.sh (or just link)\n" "$canonical_real" >&2
+    exit 1
+  fi
+fi
+
 INSTALL_MANIFEST="$DOTFILES/.install-manifest"
 : > "$INSTALL_MANIFEST"
 
