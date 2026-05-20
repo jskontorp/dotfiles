@@ -112,6 +112,16 @@ const ISSUE_FIELDS = `fragment F on Issue {
   id identifier title description url priorityLabel
   state { name } assignee { name } labels { nodes { name } }
   project { name id } cycle { name number } createdAt updatedAt
+  parent { identifier title state { name } url }
+  children(first: 50) { nodes { identifier title state { name } url } }
+}`;
+
+const RELATION_FIELDS = `fragment RF on IssueRelation {
+  id type relatedIssue { identifier title state { name } url }
+}`;
+
+const INVERSE_RELATION_FIELDS = `fragment IRF on IssueRelation {
+  id type issue { identifier title state { name } url }
 }`;
 
 const SEARCH_FIELDS = `fragment SF on IssueSearchResult {
@@ -121,7 +131,24 @@ const SEARCH_FIELDS = `fragment SF on IssueSearchResult {
 }`;
 
 const SEARCH = `${SEARCH_FIELDS} query($q:String!){ searchIssues(term:$q,first:20){ totalCount nodes{...SF} } }`;
-const GET = `${ISSUE_FIELDS} query($id:String!){ issue(id:$id){...F comments(first:50){ nodes{ body user{name} createdAt } } } }`;
+const GET = `${ISSUE_FIELDS}
+${RELATION_FIELDS}
+${INVERSE_RELATION_FIELDS}
+query($id:String!){
+  issue(id:$id){
+    ...F
+    comments(first:50){ nodes{ body user{name} createdAt } }
+    relations(first:50){ nodes{...RF} }
+    inverseRelations(first:50){ nodes{...IRF} }
+  }
+}`;
+
+const LIST_ISSUES = `${ISSUE_FIELDS} query($filter:IssueFilter,$first:Int!){
+  issues(filter:$filter, first:$first, orderBy:updatedAt){
+    nodes{...F}
+    pageInfo{ hasNextPage }
+  }
+}`;
 const MY = `${ISSUE_FIELDS} query{ viewer{ assignedIssues(first:50,filter:{state:{type:{nin:["completed","cancelled"]}}},orderBy:updatedAt){ totalCount nodes{...F} } } }`;
 const TEAMS = `query{ teams{ nodes{ id name key issueCount } } }`;
 const TEAM_STATES = `query($key:String!){ teams(filter:{key:{eq:$key}}){ nodes{ id key states{ nodes{ id name type } } } } }`;
@@ -144,6 +171,17 @@ const CREATE_COMMENT = `mutation($input: CommentCreateInput!) {
 
 const CREATE_PROJECT_UPDATE = `mutation($input: ProjectUpdateCreateInput!) {
   projectUpdateCreate(input: $input) { success projectUpdate { id url body health user { name } project { name } createdAt } }
+}`;
+
+const CREATE_RELATION = `mutation($input: IssueRelationCreateInput!) {
+  issueRelationCreate(input: $input) {
+    success
+    issueRelation { id type issue { identifier } relatedIssue { identifier title } }
+  }
+}`;
+
+const DELETE_RELATION = `mutation($id: String!) {
+  issueRelationDelete(id: $id) { success }
 }`;
 
 // ── Resolvers (name → ID) ──────────────────────────────────────────────────
@@ -265,8 +303,36 @@ function fmt(issue: any, verbose = false): string {
 	].filter(Boolean);
 	parts.push(`  ${meta.join(" · ")}`);
 	if (issue.url) parts.push(`  ${issue.url}`);
-	if (verbose && issue.description) parts.push("", issue.description);
+	if (verbose) {
+		if (issue.parent) {
+			parts.push(`  Parent: **${issue.parent.identifier}** ${issue.parent.title} (${issue.parent.state?.name ?? "?"})`);
+		}
+		const kids = issue.children?.nodes ?? [];
+		if (kids.length) {
+			parts.push(`  Sub-issues (${kids.length}):`);
+			for (const k of kids) {
+				parts.push(`    - **${k.identifier}** ${k.title} (${k.state?.name ?? "?"})`);
+			}
+		}
+		if (issue.description) parts.push("", issue.description);
+	}
 	return parts.join("\n");
+}
+
+function fmtRelations(relations: any[], inverse: any[]): string {
+	if (!relations.length && !inverse.length) return "";
+	const lines: string[] = ["", "### Relations"];
+	for (const r of relations) {
+		const t = r.relatedIssue;
+		if (!t) continue;
+		lines.push(`- **${r.type}** → ${t.identifier} ${t.title} (${t.state?.name ?? "?"})`);
+	}
+	for (const r of inverse) {
+		const s = r.issue;
+		if (!s) continue;
+		lines.push(`- **${r.type}** ← ${s.identifier} ${s.title} (${s.state?.name ?? "?"})`);
+	}
+	return lines.join("\n");
 }
 
 function fmtList(issues: any[], total?: number): string {
@@ -319,6 +385,8 @@ const actions: Record<string, (ws: Workspace, p: any, signal: Sig) => Promise<st
 		const issue = data.issue;
 		if (!issue) throw new Error(`Issue ${p.issue_id} not found in ${ws.label} workspace.`);
 		let out = fmt(issue, true);
+		const rel = fmtRelations(issue.relations?.nodes ?? [], issue.inverseRelations?.nodes ?? []);
+		if (rel) out += `\n${rel}`;
 		const comments = issue.comments?.nodes ?? [];
 		if (comments.length) {
 			out += "\n\n### Comments\n";
@@ -326,6 +394,24 @@ const actions: Record<string, (ws: Workspace, p: any, signal: Sig) => Promise<st
 				out += `\n**${c.user?.name ?? "Unknown"}** (${c.createdAt?.slice(0, 10) ?? ""}):\n${c.body}\n`;
 			}
 		}
+		return out;
+	},
+
+	async list_issues(ws, p, signal) {
+		const filter: any = {};
+		if (p.project_id) filter.project = { id: { eq: p.project_id } };
+		if (p.team_key) filter.team = { key: { eq: p.team_key } };
+		if (p.state) filter.state = { ...(filter.state ?? {}), name: { eqIgnoreCase: p.state } };
+		if (p.state_type) filter.state = { ...(filter.state ?? {}), type: { eq: p.state_type } };
+		if (p.priority != null) filter.priority = { eq: Number(p.priority) };
+		if (p.assignee_me) filter.assignee = { isMe: { eq: true } };
+		else if (p.assignee) filter.assignee = { name: { eqIgnoreCase: p.assignee } };
+		const first = Math.max(1, Math.min(Number(p.limit) || 25, 100));
+		const data = await gql(ws, LIST_ISSUES, { filter, first }, signal);
+		const { nodes, pageInfo } = data.issues;
+		if (!nodes.length) return `No issues found in ${ws.label} workspace matching filter.`;
+		let out = nodes.map((i: any) => fmt(i)).join("\n\n");
+		if (pageInfo?.hasNextPage) out += `\n\n(showing first ${nodes.length}; more available — narrow filter or raise limit, max 100)`;
 		return out;
 	},
 
@@ -375,14 +461,16 @@ const actions: Record<string, (ws: Workspace, p: any, signal: Sig) => Promise<st
 		if (p.description) input.description = p.description;
 		if (p.priority != null) input.priority = Number(p.priority);
 
-		const [stateId, assigneeId, labelIds] = await Promise.all([
+		const [stateId, assigneeId, labelIds, parent] = await Promise.all([
 			p.state ? resolveState(ws, teamId, p.state, signal) : undefined,
 			p.assignee ? resolveAssignee(ws, p.assignee, signal) : undefined,
 			p.labels ? resolveLabels(ws, teamId, parseLabels(p.labels), signal) : undefined,
+			p.parent_id ? resolveIssue(ws, p.parent_id, signal) : undefined,
 		]);
 		if (stateId) input.stateId = stateId;
 		if (assigneeId) input.assigneeId = assigneeId;
 		if (labelIds?.length) input.labelIds = labelIds;
+		if (parent) input.parentId = parent.id;
 
 		const data = await gql(ws, CREATE_ISSUE, { input }, signal);
 		if (!data.issueCreate.success) throw new Error("Failed to create issue.");
@@ -396,18 +484,21 @@ const actions: Record<string, (ws: Workspace, p: any, signal: Sig) => Promise<st
 		if (p.description) input.description = p.description;
 		if (p.priority != null) input.priority = Number(p.priority);
 
-		const [stateId, assigneeId, labelIds] = await Promise.all([
+		const [stateId, assigneeId, labelIds, parent] = await Promise.all([
 			p.state ? resolveState(ws, teamId, p.state, signal) : undefined,
 			p.assignee ? resolveAssignee(ws, p.assignee, signal) : undefined,
 			p.labels ? resolveLabels(ws, teamId, parseLabels(p.labels), signal) : undefined,
+			p.parent_id && p.parent_id !== "none" ? resolveIssue(ws, p.parent_id, signal) : undefined,
 		]);
 		if (stateId) input.stateId = stateId;
 		if (assigneeId) input.assigneeId = assigneeId;
 		if (labelIds?.length) input.labelIds = labelIds;
+		if (parent) input.parentId = parent.id;
+		else if (p.parent_id === "none") input.parentId = null;
 
 		if (!Object.keys(input).length) {
 			throw new Error(
-				"No fields to update. Provide title, description, state, assignee, priority, or labels.",
+				"No fields to update. Provide title, description, state, assignee, priority, labels, or parent_id.",
 			);
 		}
 		const data = await gql(ws, UPDATE_ISSUE, { id, input }, signal);
@@ -421,6 +512,63 @@ const actions: Record<string, (ws: Workspace, p: any, signal: Sig) => Promise<st
 		if (!data.commentCreate.success) throw new Error("Failed to add comment.");
 		const c = data.commentCreate.comment;
 		return `Comment added by ${c.user?.name ?? "you"} (${c.createdAt?.slice(0, 10) ?? "now"}):\n${c.body}`;
+	},
+
+	async add_relation(ws, p, signal) {
+		const { id: issueId } = await resolveIssue(ws, p.issue_id, signal);
+		const { id: relatedIssueId } = await resolveIssue(ws, p.target_id, signal);
+		const data = await gql(
+			ws,
+			CREATE_RELATION,
+			{ input: { issueId, relatedIssueId, type: p.relation_type } },
+			signal,
+		);
+		if (!data.issueRelationCreate.success) throw new Error("Failed to create relation.");
+		const r = data.issueRelationCreate.issueRelation;
+		return `Relation added in ${ws.label}: ${r.issue.identifier} — **${r.type}** → ${r.relatedIssue.identifier} ${r.relatedIssue.title}`;
+	},
+
+	async remove_relation(ws, p, signal) {
+		const data = await gql(ws, GET, { id: p.issue_id }, signal);
+		const issue = data.issue;
+		if (!issue) throw new Error(`Issue ${p.issue_id} not found in ${ws.label} workspace.`);
+		const targetLower = p.target_id.toLowerCase();
+		const typeLower = p.relation_type?.toLowerCase();
+		const pool = [
+			...(issue.relations?.nodes ?? []).map((r: any) => ({
+				id: r.id,
+				type: r.type,
+				other: r.relatedIssue?.identifier,
+				direction: "→",
+			})),
+			...(issue.inverseRelations?.nodes ?? []).map((r: any) => ({
+				id: r.id,
+				type: r.type,
+				other: r.issue?.identifier,
+				direction: "←",
+			})),
+		];
+		const matches = pool.filter(
+			(r) =>
+				r.other?.toLowerCase() === targetLower &&
+				(!typeLower || r.type?.toLowerCase() === typeLower),
+		);
+		if (!matches.length) {
+			throw new Error(
+				`No relation found between ${p.issue_id} and ${p.target_id}` +
+					(p.relation_type ? ` of type "${p.relation_type}"` : "") +
+					`. Existing relations: ${pool.map((r) => `${r.direction}${r.other}/${r.type}`).join(", ") || "none"}.`,
+			);
+		}
+		if (matches.length > 1) {
+			throw new Error(
+				`Ambiguous: ${matches.length} relations match between ${p.issue_id} and ${p.target_id}. ` +
+					`Pass relation_type to disambiguate (found: ${matches.map((m) => m.type).join(", ")}).`,
+			);
+		}
+		const del = await gql(ws, DELETE_RELATION, { id: matches[0].id }, signal);
+		if (!del.issueRelationDelete.success) throw new Error("Failed to delete relation.");
+		return `Relation removed in ${ws.label}: ${p.issue_id} ${matches[0].direction} ${matches[0].other} (${matches[0].type}).`;
 	},
 
 	async create_project_update(ws, p, signal) {
@@ -446,6 +594,9 @@ const required: Record<string, string[]> = {
 	update_issue: ["issue_id"],
 	add_comment: ["issue_id", "body"],
 	create_project_update: ["project_id", "body"],
+	add_relation: ["issue_id", "target_id", "relation_type"],
+	remove_relation: ["issue_id", "target_id"],
+	list_issues: [],
 };
 
 const READ_ACTIONS = new Set([
@@ -456,6 +607,7 @@ const READ_ACTIONS = new Set([
 	"get_team_states",
 	"list_projects",
 	"get_project",
+	"list_issues",
 ]);
 
 // add_comment is intentionally NOT gated — short, frequent, low blast radius.
@@ -463,6 +615,7 @@ const GATED_WRITE_ACTIONS = new Set(["create_issue", "update_issue", "create_pro
 
 const ALL_ACTIONS = [
 	"search",
+	"list_issues",
 	"get_issue",
 	"my_issues",
 	"list_teams",
@@ -472,22 +625,29 @@ const ALL_ACTIONS = [
 	"create_issue",
 	"update_issue",
 	"add_comment",
+	"add_relation",
+	"remove_relation",
 	"create_project_update",
 ] as const;
+
+const RELATION_TYPES = ["related", "blocks", "duplicate"] as const;
+const STATE_TYPES = ["triage", "backlog", "unstarted", "started", "completed", "canceled"] as const;
 
 const Params = Type.Object({
 	action: StringEnum(ALL_ACTIONS, {
 		description:
-			'"search" — full-text issue search; ' +
-			'"get_issue" — fetch issue with comments by identifier (e.g. JSK-123); ' +
+			'"search" — fuzzy text search across all issues; ' +
+			'"list_issues" — structured filter (project_id/team_key/state/state_type/assignee/assignee_me/priority/limit); ' +
+			'"get_issue" — fetch issue with comments, relations, parent + sub-issues; ' +
 			'"my_issues" — your active assigned issues; ' +
 			'"list_teams" — teams + keys; ' +
 			'"get_team_states" — workflow states for a team; ' +
 			'"list_projects" — recent projects; ' +
 			'"get_project" — single project detail; ' +
 			'"create_issue" — new issue (gated); ' +
-			'"update_issue" — update fields (gated); ' +
+			'"update_issue" — update fields incl. parent_id (gated); ' +
 			'"add_comment" — add comment (ungated); ' +
+			'"add_relation" / "remove_relation" — manage related/blocks/duplicate links (ungated, metadata); ' +
 			'"create_project_update" — post a project update with health (gated).',
 	}),
 	query: Type.Optional(Type.String({ description: 'Search text (required for "search").' })),
@@ -522,6 +682,43 @@ const Params = Type.Object({
 			description: 'Markdown body — comment text for add_comment; project-update body for create_project_update.',
 		}),
 	),
+	target_id: Type.Optional(
+		Type.String({
+			description: 'Other-issue identifier for add_relation / remove_relation (e.g. "JSK-25").',
+		}),
+	),
+	relation_type: Type.Optional(
+		StringEnum(RELATION_TYPES, {
+			description:
+				'Relation type for add_relation (required) / remove_relation (optional disambiguator). ' +
+				'"related" = soft link; "blocks" = source blocks target (use from blocker side); ' +
+				'"duplicate" = source is duplicate of target.',
+		}),
+	),
+	parent_id: Type.Optional(
+		Type.String({
+			description:
+				'Parent issue identifier for create_issue / update_issue (e.g. "JSK-25"). ' +
+				'Pass "none" in update_issue to clear an existing parent.',
+		}),
+	),
+	state_type: Type.Optional(
+		StringEnum(STATE_TYPES, {
+			description:
+				'Workflow-state type filter for list_issues (triage/backlog/unstarted/started/completed/canceled). ' +
+				'Use this for "all triage tickets" without caring about exact state name.',
+		}),
+	),
+	assignee_me: Type.Optional(
+		Type.Boolean({
+			description: 'list_issues filter: only issues assigned to the calling user (overrides "assignee").',
+		}),
+	),
+	limit: Type.Optional(
+		Type.Number({
+			description: 'list_issues max results (default 25, max 100).',
+		}),
+	),
 	health: Type.Optional(
 		StringEnum(["onTrack", "atRisk", "offTrack"] as const, {
 			description: "Project-update health (optional, only for create_project_update).",
@@ -542,9 +739,12 @@ export default function (pi: ExtensionAPI) {
 			`Output truncated to ${DEFAULT_MAX_LINES} lines or ${formatSize(DEFAULT_MAX_BYTES)}.`,
 		promptGuidelines: [
 			"Use list_teams to discover team keys before create_issue.",
-			"Use search to check for existing issues before creating duplicates.",
+			"Use list_issues (not search) when you need filtered enumeration — e.g. all triage tickets in a project: list_issues with project_id + state_type='triage'.",
+			"Use search for fuzzy text queries; use list_issues for structured filters.",
 			"State, assignee, and label names are resolved by case-insensitive exact match. Errors list available options.",
 			"To set an issue to In Progress, call update_issue with state: 'In Progress'.",
+			"Relations: add_relation needs issue_id + target_id + relation_type. File 'blocks' from the blocker's side; the other side appears as inverse in get_issue.",
+			"Parent/sub-issues: pass parent_id (e.g. 'JSK-25') on create_issue or update_issue; 'none' clears it on update.",
 			"On a git branch matching [A-Z]+-\\d+ (e.g. jsk-36-silencing-hook), the identifier likely refers to a Linear issue.",
 			"Workspace routing is automatic from cwd — do not pass an API key.",
 		],
