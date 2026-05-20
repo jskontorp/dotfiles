@@ -3,7 +3,5 @@
   "defaultModel": "claude-opus-4.7",
   "defaultThinkingLevel": "medium",
   "hideThinkingBlock": false,
-  "packages": [
-    "npm:@feniix/pi-notion"
-  ]
+  "packages": []
 }

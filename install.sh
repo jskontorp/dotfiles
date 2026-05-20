@@ -131,7 +131,23 @@ if [[ -d "$DOTFILES/pi/agent/extensions" ]]; then
   # regression class as the solve-ticket skill cleanup above. Listed by
   # filename, not glob, so legitimate future extensions are never swept.
   rm -f ~/.pi/agent/extensions/linear-routing.ts
+  rm -f ~/.pi/agent/extensions/notion-routing.ts
 fi
+
+# Cleanup: feniix Notion OAuth refresh tokens left on disk after the
+# 2026-05-20 migration to per-workspace integration tokens. These files
+# contain live credentials — deliberate one-shot removal during install,
+# announced on stderr so the user sees it happen. Listed by filename;
+# `notion-mcp-auth.json` is feniix's default-workspace fallback. If you
+# rolled back to feniix you would have to re-OAuth, which is fine.
+for stale in ~/.pi/agent/notion-mcp-auth.json \
+             ~/.pi/agent/notion-mcp-auth-personal.json \
+             ~/.pi/agent/notion-mcp-auth-volve.json; do
+  if [[ -f "$stale" ]]; then
+    printf "⚠ removing stale feniix Notion OAuth token: %s\n" "$stale" >&2
+    rm -f "$stale"
+  fi
+done
 
 # --- Claude Code linking ---
 # Mirror pi skills compatible with Claude Code into ~/.claude/skills/, and
@@ -437,7 +453,6 @@ find ~/.config/zsh -maxdepth 1 -type l ! -exec test -e {} \; -delete 2>/dev/null
 _link "$DOTFILES/zsh/core.zsh"          ~/.config/zsh/
 _link "$DOTFILES/zsh/git-aliases.zsh"   ~/.config/zsh/
 _link "$DOTFILES/zsh/git-helpers.zsh"   ~/.config/zsh/
-_link "$DOTFILES/zsh/pi-notion-routing.zsh" ~/.config/zsh/
 
 # Clean up files from previous installs (rename + graveyard removals).
 # uninstall.sh is manifest-driven and would also handle these, but `just link`
@@ -446,6 +461,7 @@ rm -f ~/.config/zsh/sv.zsh             # renamed (long ago) to sv-completion.zsh
 rm -f ~/.config/zsh/git-worktrees.zsh  # graveyarded 2026-05-12
 rm -f ~/.config/zsh/sv-proxy.zsh       # graveyarded 2026-05-12
 rm -f ~/.config/zsh/sv-completion.zsh  # graveyarded 2026-05-12
+rm -f ~/.config/zsh/pi-notion-routing.zsh  # decommissioned 2026-05-20 (feniix Notion auth-file routing no longer needed)
 
 # Machine-specific zsh helpers
 if [[ "$MACHINE" == "mac" ]]; then
