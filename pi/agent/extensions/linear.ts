@@ -550,7 +550,7 @@ export default function (pi: ExtensionAPI) {
 		],
 		parameters: Params,
 
-		async execute(_id: any, params: any, signal: Sig, ctx: any) {
+		async execute(_id: any, params: any, signal: Sig, _onUpdate: any, ctx: any) {
 			try {
 				validateRequired(params.action, params, required[params.action] ?? []);
 				const handler = actions[params.action];
