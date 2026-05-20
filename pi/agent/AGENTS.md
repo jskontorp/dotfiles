@@ -17,6 +17,8 @@ When something fails (tool call, build, test):
 
 If a subagent dispatch returns a partial-response or stream-idle error: check for visible side effects (committed files, written artefacts) first. If they exist, re-read the affected files and resume from observed state — re-dispatching restarts from zero and double-applies them. If none, re-dispatch fresh. (Elapsed-time labels during a stall are not work — read progress from side effects only.)
 
+When delegating adversarial review to sub-agents (find overclaims, missed concerns, lies in PR comments / commit messages / reply drafts), include **resolved+outdated** review threads in the audit surface — not just open or in-flight ones. A resolution can itself be wrong: author over-reverting on bot speculation, premature self-closure, claim-without-counterparty-confirmation. The probe is *"was the resolution correct?"*, not *"is there an unaddressed concern?"*. (Evidence: VOLVE-908 / PR #1335, 2026-05-20 — Cursor thread `CwB_y` resolved+outdated, contained over-revert of CTO commit `0238653d` in another agent's code surface; escaped first-round multi-agent review because resolved threads were treated as already-cleared; un-revert landed in `e0f650f2` after user catch.)
+
 For broader long-plan execution discipline (ledger split, pre-compact protocol, reviewer-brief sizing), see [`ideas/long-plan-execution/design.md`](../../ideas/long-plan-execution/design.md). Revisit the question of promoting these notes into a skill on the trigger documented there.
 
 Call multiple tools in a single response when there are no dependencies between the calls. If two reads or searches are independent, run them in parallel. An edit (or write) depends on the read of the same file: read first, edit in the next response.
