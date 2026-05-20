@@ -219,7 +219,7 @@ async function resolveState(
 ): Promise<string> {
 	const data = await gql(
 		ws,
-		`query($teamId: String!) { workflowStates(filter: { team: { id: { eq: $teamId } } }) { nodes { id name } } }`,
+		`query($teamId: ID!) { workflowStates(filter: { team: { id: { eq: $teamId } } }) { nodes { id name } } }`,
 		{ teamId },
 		signal,
 	);
@@ -265,7 +265,7 @@ async function resolveLabels(
 ): Promise<string[]> {
 	const data = await gql(
 		ws,
-		`query($teamId: String!) { team(id: $teamId) { labels { nodes { id name } } } }`,
+		`query($teamId: ID!) { team(id: $teamId) { labels { nodes { id name } } } }`,
 		{ teamId },
 		signal,
 	);
