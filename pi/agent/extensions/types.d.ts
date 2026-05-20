@@ -54,3 +54,6 @@ declare type AbortSignal = any;
 declare const AbortSignal: any;
 declare const URLSearchParams: any;
 declare type URLSearchParams = any;
+declare const AbortController: any;
+declare function setTimeout(cb: (...args: any[]) => any, ms: number): any;
+declare function clearTimeout(handle: any): void;

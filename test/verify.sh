@@ -132,10 +132,16 @@ run_test() {
   check "delegate has scripts/"            'dexec test -d /home/testuser/.pi/agent/skills/delegate/scripts'
   check "AGENTS.md contains NAJA"          'dexec grep -q NAJA /home/testuser/.pi/agent/AGENTS.md'
   check "at least 5 skill symlinks"        'dexec bash -c "[[ \$(find ~/.pi/agent/skills -maxdepth 1 -type l | wc -l) -ge 5 ]]"'
-  check "settings.json lists pi-linear-tools package" \
-    'dexec grep -q "@fink-andreas/pi-linear-tools" /home/testuser/.pi/agent/settings.json'
   check "settings.json lists pi-notion package" \
     'dexec grep -q "@feniix/pi-notion" /home/testuser/.pi/agent/settings.json'
+  check "settings.json does NOT list pi-linear-tools" \
+    'dexec bash -c "! grep -q fink-andreas /home/testuser/.pi/agent/settings.json"'
+  check "linear.ts extension symlinked" \
+    'dexec test -L /home/testuser/.pi/agent/extensions/linear.ts'
+  check "extensions/shared/ directory symlinked" \
+    'dexec test -L /home/testuser/.pi/agent/extensions/shared'
+  check "linear-routing.ts orphan symlink removed" \
+    'dexec bash -c "! test -e /home/testuser/.pi/agent/extensions/linear-routing.ts"'
 
   # --- Claude Code linking ---
   printf "\nClaude Code linking:\n"

@@ -508,6 +508,12 @@ check:
     else
       ( cd {{DOTFILES}}/pi/agent/extensions && tsc --noEmit ) && printf "  ✅ no type errors\n"
     fi
+    printf "\nextensions (node unit tests):\n"
+    if ! command -v node >/dev/null 2>&1; then
+      printf "  ⚠ node not on PATH — skipped\n" >&2
+    else
+      ( cd {{DOTFILES}} && node --test pi/agent/extensions/shared/*.test.mjs >/dev/null ) && printf "  ✅ unit tests pass\n"
+    fi
     printf "\nBrewfile (mac):\n"
     if [[ "$(uname -s)" == "Darwin" ]]; then
       if ! command -v brew >/dev/null 2>&1; then

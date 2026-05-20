@@ -4,7 +4,6 @@
   "defaultThinkingLevel": "medium",
   "hideThinkingBlock": false,
   "packages": [
-    "npm:@fink-andreas/pi-linear-tools",
     "npm:@feniix/pi-notion"
   ]
 }

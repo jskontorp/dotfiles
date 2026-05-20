@@ -6,7 +6,7 @@ description: >-
   Does NOT apply fixes, resolve threads, or mark the PR ready. For the apply-and-land
   flow, use `prepare-merge` instead.
 compatibility: Requires git, gh
-allowed-tools: Bash(git:*) Bash(gh:*) Bash(rg:*) Bash(curl:*) linear_issue Read
+allowed-tools: Bash(git:*) Bash(gh:*) Bash(rg:*) Bash(curl:*) linear Read
 claude-compatible: false
 ---
 

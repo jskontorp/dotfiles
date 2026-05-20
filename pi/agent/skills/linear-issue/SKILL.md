@@ -1,23 +1,23 @@
 ---
 name: linear-issue
 description: >-
-  Draft and create a Linear issue via @fink-andreas/pi-linear-tools with a
+  Draft and create a Linear issue via the in-repo `linear` extension with a
   confirm-before-create loop. Use when the user says "create a linear issue",
   "file a ticket", "add to linear", or similar. The correct workspace (Volve
-  vs. personal) is auto-selected from cwd by the linear-routing extension —
-  do not try to pass an API key or workspace yourself.
+  vs. personal) is auto-selected from cwd by the extension — do not try to
+  pass an API key or workspace yourself.
 claude-compatible: false
 ---
 
 # Linear issue (draft → confirm → create)
 
-A confirm gate wraps write actions on the `linear_*` tools (create, update,
-delete, archive, unarchive). `comment` and `start` skip the gate — comments
-are short and frequent, `start` just moves state to In Progress. Produce a
+The `linear` tool is action-dispatched. A confirm gate wraps the write
+actions `create_issue`, `update_issue`, and `create_project_update`.
+`add_comment` skips the gate — comments are short and frequent. Produce a
 clean draft on the first call; the user sees a preview and picks the action
-button (e.g. `create`) / `revise` / `cancel`. If they pick `revise`, the tool
-call is blocked with their feedback as the reason — redraft from that
-feedback and call again.
+button (e.g. `create_issue`) / `revise` / `cancel`. If they pick `revise`,
+the tool call is blocked with their feedback as the reason — redraft from
+that feedback and call again.
 
 ## Draft
 
@@ -26,8 +26,8 @@ reasonably pick yourself.
 
 - **title** — one clear line, imperative mood, no ticket prefixes.
 - **description** — see *Voice* below.
-- **team** — suggest one based on the repo / topic. If you truly don't know,
-  call `linear_team` with `action: "list"` once, then decide.
+- **team_key** — suggest one based on the repo / topic. If you truly don't
+  know, call `linear` with `action: "list_teams"` once, then decide.
 - **priority** — suggest one: `1` Urgent, `2` High, `3` Medium, `4` Low, `0` No priority.
   Default bias: `3` Medium for bugs, `4` Low for chores. Suggest `2` High only
   when the user's wording signals urgency.
@@ -62,14 +62,25 @@ Other drafting rules:
 
 ## Call the tool
 
-Call `linear_issue` with `action: "create"` and the fields you inferred. The
+Call `linear` with `action: "create_issue"` and the fields you inferred. The
 extension renders a markdown preview and prompts the user.
 
 ## Handle the result
 
-- **Action button (e.g. `create`)** → issue is created. Report the issue key + URL, nothing else.
+- **Action button (e.g. `create_issue`)** → issue is created. Report the
+  issue key + URL, nothing else.
 - **`revise`** → the tool call is blocked with a reason starting with
   `User requested changes` and containing the user's feedback. Apply the
-  feedback, call `linear_issue create` again. The gate will show the new
+  feedback, call `linear create_issue` again. The gate will show the new
   preview.
 - **`cancel`** → the tool call is blocked. Acknowledge briefly and stop.
+
+## Other actions worth knowing
+
+- **`update_issue`** — same gate, fields: `issue_id` plus any subset of
+  `title`, `description`, `state` (resolved by case-insensitive exact name —
+  use `get_team_states` to discover), `assignee`, `priority`, `labels`.
+  Use this to move state instead of looking for a `start` verb.
+- **`add_comment`** — ungated. `issue_id` + `body`.
+- **`get_issue`** — read the body + comments before commenting / updating.
+- **`list_teams`** / **`get_team_states`** — discovery helpers.

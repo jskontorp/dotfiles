@@ -5,7 +5,7 @@ description: >-
   Use when the user explicitly says "prepare merge", "prepare for merge", or "ready to merge".
   Do NOT use for general code reviews or uncommitted change reviews.
 compatibility: Requires git, gh
-allowed-tools: Bash(git:*) Bash(gh:*) Bash(rg:*) Bash(curl:*) linear_issue Read Edit
+allowed-tools: Bash(git:*) Bash(gh:*) Bash(rg:*) Bash(curl:*) linear Read Edit
 ---
 
 # Prepare Merge
@@ -58,7 +58,7 @@ Before reading the code, extract the contracts the PR *claims* to uphold. LLM re
 Read, in order:
 
 1. **PR description** — `gh pr view --json body --jq '.body'`.
-2. **Linked Linear / Jira issue** — if a URL appears in the PR body, best-effort fetch (`linear_issue` tool, `gh api`, or `curl`). Skip on failure; don't block the review.
+2. **Linked Linear / Jira issue** — if a URL appears in the PR body, best-effort fetch (`linear` tool with `action: "get_issue"`, `gh api`, or `curl`). Skip on failure; don't block the review.
 3. **In-repo spec** — glob for the feature name from the PR title: `docs/superpowers/specs/*.md`, `docs/specs/*.md`, `specs/*.md`. Read any match.
 
 From these sources, extract a bulleted list of the **contracts the code claims**. A contract is a falsifiable statement about runtime behaviour. Examples of contract shapes:

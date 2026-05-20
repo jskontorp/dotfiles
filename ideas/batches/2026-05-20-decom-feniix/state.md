@@ -31,4 +31,5 @@ Known deferred / NOT verified end-to-end: actual Notion property writes to real 
 
 ## Status
 
-- 2026-05-20 phase 1: starting.
+- 2026-05-20 phase 1: shared/{workspace,preview}.ts + node unit test committed (7c9bebe).
+- 2026-05-20 phase 2: in progress.

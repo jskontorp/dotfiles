@@ -120,6 +120,17 @@ if [[ -d "$DOTFILES/pi/agent/extensions" ]]; then
     [[ "$ext" == *.d.ts ]] && continue
     _link "$ext" ~/.pi/agent/extensions/"$(basename "$ext")"
   done
+  # shared/ holds helper modules imported by the top-level extensions via
+  # `./shared/<name>`. Symlink the whole directory so subpath imports resolve
+  # without recursing into install.sh's glob.
+  if [[ -d "$DOTFILES/pi/agent/extensions/shared" ]]; then
+    _linkd "$DOTFILES/pi/agent/extensions/shared" ~/.pi/agent/extensions/shared
+  fi
+  # Cleanup: extensions decommissioned 2026-05-20 (feniix/fink-andreas
+  # decommission). Same "Project decommission leaves orphan symlinks"
+  # regression class as the solve-ticket skill cleanup above. Listed by
+  # filename, not glob, so legitimate future extensions are never swept.
+  rm -f ~/.pi/agent/extensions/linear-routing.ts
 fi
 
 # --- Claude Code linking ---
