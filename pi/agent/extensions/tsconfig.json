@@ -10,5 +10,5 @@
     "lib": ["es2022"],
     "types": []
   },
-  "include": ["*.ts"]
+  "include": ["*.ts", "shared/*.ts"]
 }
