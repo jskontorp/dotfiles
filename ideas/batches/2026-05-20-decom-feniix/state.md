@@ -1,5 +1,7 @@
 # batch: decom-feniix
 
+closed: 2026-05-20
+
 Replace `@fink-andreas/pi-linear-tools` + `@feniix/pi-notion` npm stack with in-repo Linear/Notion extensions using direct HTTP APIs and per-workspace auth (keychain on Mac, env file on Linux/VM). Strategic move — no upstream-bug forcing function. Triple-review synthesis at `.pi-delegate/batch-3/triple-review-synthesis.md` in canonical.
 
 ## Standing Directives
@@ -33,4 +35,6 @@ Known deferred / NOT verified end-to-end: actual Notion property writes to real 
 
 - 2026-05-20 phase 1: shared/{workspace,preview}.ts + node unit test committed (7c9bebe).
 - 2026-05-20 phase 2: Linear extension landed (d6fc3ff). settings.json drops @fink-andreas/pi-linear-tools, linear-routing.ts removed, skills + verify.sh + AGENTS.md updated.
-- 2026-05-20 phase 3: in progress.
+- 2026-05-20 phase 3: Notion extension landed (b993789). @feniix/pi-notion dropped, notion-routing.ts + zsh/pi-notion-routing.zsh deleted, OAuth refresh tokens auto-cleaned by install.sh.
+- 2026-05-20 fix: execute() 5-arg signature drift (86df59d) + regression-class entry (19067dc).
+- 2026-05-20 close: Mac verified end-to-end (linear list_teams + notion smoke). Linear tickets filed: JSK-55 (Linear), JSK-56 (Notion). VM install pending — owner's responsibility on next VM session.
