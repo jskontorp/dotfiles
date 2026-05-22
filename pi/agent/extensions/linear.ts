@@ -196,6 +196,15 @@ async function resolveTeam(ws: Workspace, key: string, signal?: Sig): Promise<st
 	return team.id;
 }
 
+// Linear's `project(id:...)` query accepts UUID and URL-slug; mutation
+// inputs like `IssueUpdateInput.projectId` require the canonical UUID. Round-
+// trip through the query to resolve either form to UUID.
+async function resolveProject(ws: Workspace, idOrSlug: string, signal?: Sig): Promise<string> {
+	const data = await gql(ws, PROJECT, { id: idOrSlug }, signal);
+	if (!data.project) throw new Error(`Project "${idOrSlug}" not found in ${ws.label} workspace.`);
+	return data.project.id;
+}
+
 async function resolveIssue(
 	ws: Workspace,
 	identifier: string,
@@ -460,7 +469,7 @@ const actions: Record<string, (ws: Workspace, p: any, signal: Sig) => Promise<st
 		const input: any = { teamId, title: p.title };
 		if (p.description) input.description = p.description;
 		if (p.priority != null) input.priority = Number(p.priority);
-		if (p.project_id) input.projectId = p.project_id;
+		if (p.project_id) input.projectId = await resolveProject(ws, p.project_id, signal);
 
 		const [stateId, assigneeId, labelIds, parent] = await Promise.all([
 			p.state ? resolveState(ws, teamId, p.state, signal) : undefined,
@@ -484,7 +493,10 @@ const actions: Record<string, (ws: Workspace, p: any, signal: Sig) => Promise<st
 		if (p.title) input.title = p.title;
 		if (p.description) input.description = p.description;
 		if (p.priority != null) input.priority = Number(p.priority);
-		if (p.project_id) input.projectId = p.project_id === "none" ? null : p.project_id;
+		if (p.project_id) {
+			input.projectId =
+				p.project_id === "none" ? null : await resolveProject(ws, p.project_id, signal);
+		}
 
 		const [stateId, assigneeId, labelIds, parent] = await Promise.all([
 			p.state ? resolveState(ws, teamId, p.state, signal) : undefined,
