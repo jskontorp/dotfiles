@@ -278,9 +278,10 @@ done
 
 If `TMUX_PANE` is set in the parent shell (e.g. you're inside a tmux
 pane but want headless mode anyway), the TUI gate will refuse TUI mode
-automatically when the pane geometry or attached-client check fails —
-you don't need to `unset TMUX_PANE`. The gate is the contract; explicit
-`unset` is no longer necessary.
+automatically because every headless / sequential recipe above redirects
+stdout to `/dev/null` and the gate refuses TUI when stdout isn't a tty.
+You don't need to `unset TMUX_PANE`. The gate is the contract; explicit
+`unset` is unnecessary.
 
 Align `poll.sh`'s `MAX_WAIT` with the per-task timeout instead of using a
 flat budget. The per-task `TIMEOUT` is the longest a single task can

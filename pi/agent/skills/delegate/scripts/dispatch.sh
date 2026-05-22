@@ -65,8 +65,22 @@ fi
 # pre-render and routes through headless instead. DELEGATE_MIN_PANE_HEIGHT
 # is overridable but the 20-row default reflects observed first-render
 # behaviour; lower at your own risk.
+#
+# tty guard added 2026-05-22 after oracle/odev incident: when an
+# orchestrator backgrounds dispatch.sh from within its own attached tmux
+# pane (the documented "Headless orchestration" recipe), $TMUX_PANE is
+# inherited and the attached/height checks pass — but the pane is the
+# *orchestrator's*, not a fresh sub-agent pane. TUI mode then collides on
+# the orchestrator's tty (parent pi dies) and the watcher's /quit nudge
+# lands in whatever shell takes over that pane (zsh, post-crash). Refuse
+# TUI whenever stdout isn't a tty — every documented headless / sequential
+# recipe redirects stdout to /dev/null, so this only suppresses TUI in
+# exactly the cases that never wanted it. DELEGATE_ASSUME_TTY=1 is a
+# test-only seam (tui-gate.test.sh captures stdout to a log) and must not
+# be set in production callers; production dispatch always inherits a tty
+# from `tmux send-keys` execution.
 USE_TUI=false
-if [ -n "${TMUX_PANE:-}" ] && command -v jq >/dev/null 2>&1; then
+if { [ -t 1 ] || [ "${DELEGATE_ASSUME_TTY:-0}" = "1" ]; } && [ -n "${TMUX_PANE:-}" ] && command -v jq >/dev/null 2>&1; then
   ATTACHED=$(tmux display -p -t "$TMUX_PANE" '#{session_attached}' 2>/dev/null || echo 0)
   HEIGHT=$(tmux display -p -t "$TMUX_PANE" '#{pane_height}' 2>/dev/null || echo 0)
   MIN_HEIGHT="${DELEGATE_MIN_PANE_HEIGHT:-20}"

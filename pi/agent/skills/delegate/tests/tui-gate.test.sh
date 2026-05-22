@@ -73,7 +73,11 @@ run_cell() {
     unset PI_SHIM_SESSION_DIR
   fi
 
-  TMUX_PANE="%999" \
+  # DELEGATE_ASSUME_TTY=1 bypasses dispatch.sh's `[ -t 1 ]` tty guard
+  # (added 2026-05-22). The test redirects stdout to a log file, so the
+  # tty check would otherwise force USE_TUI=false for every cell and
+  # collapse the matrix. Production callers must never set this.
+  TMUX_PANE="%999" DELEGATE_ASSUME_TTY=1 \
     "$DISPATCH" task-1 "$cdir" 0 "$cdir/prompt.txt" "$cdir/results" "" "" \
     >"$cdir/dispatch.log" 2>&1 || true
 
@@ -110,6 +114,29 @@ run_cell attached-short 1  6 headless
 # Bonus cell: DELEGATE_MIN_PANE_HEIGHT override allows lower threshold.
 DELEGATE_MIN_PANE_HEIGHT=5 \
   run_cell override-allows-short 1 6 tui
+
+# tty guard (2026-05-22 oracle/odev fix): even with attached + tall pane +
+# TMUX_PANE set, dispatch must refuse TUI when stdout isn't a tty. Run
+# without DELEGATE_ASSUME_TTY and assert the headless branch is taken.
+name=tty-guard-no-tty
+cdir="$TMP/$name"
+mkdir -p "$cdir/results"
+echo "prompt" > "$cdir/prompt.txt"
+export TEST_ATTACHED=1
+export TEST_HEIGHT=24
+export PI_SHIM_ARGS_FILE="$cdir/results/task-1.args"
+export PI_SHIM_MODE="exit0"
+unset PI_SHIM_SESSION_DIR
+TMUX_PANE="%999" \
+  "$DISPATCH" task-1 "$cdir" 0 "$cdir/prompt.txt" "$cdir/results" "" "" \
+  >"$cdir/dispatch.log" 2>&1 || true
+args="$(cat "$cdir/results/task-1.args" 2>/dev/null || echo MISSING)"
+if echo "$args" | grep -q '^--no-session$' && ! echo "$args" | grep -q '^--session-dir$'; then
+  passed=$((passed+1))
+else
+  failures+=("tty-guard-no-tty (stdout not a tty, expect=headless): argv was '$args'")
+  failed=$((failed+1))
+fi
 
 echo ""
 echo "tui-gate: passed=$passed failed=$failed"

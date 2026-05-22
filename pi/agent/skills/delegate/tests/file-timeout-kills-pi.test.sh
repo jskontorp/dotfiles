@@ -78,10 +78,13 @@ export PI_SHIM_MODE="sleep"
 unset PI_SHIM_SESSION_DIR  # don't let the shim short-circuit
 
 # Fake the tmux pane so dispatch.sh takes the TUI branch.
+# DELEGATE_ASSUME_TTY=1 bypasses dispatch.sh's `[ -t 1 ]` tty guard
+# (added 2026-05-22); without it, the stdout redirect below forces the
+# headless path and the watcher never engages.
 # No outer `timeout` wrapper — not portable to default macOS — the polling
 # loop below is the safety net; if dispatch.sh hangs past deadline the test
 # SIGKILLs it and reports failure.
-TMUX_PANE="%999" \
+TMUX_PANE="%999" DELEGATE_ASSUME_TTY=1 \
   "$DISPATCH" task-1 "$CASE1" 0 "$CASE1/prompt.txt" "$CASE1/results" "" "" \
   >"$CASE1/dispatch.log" 2>&1 &
 DISPATCH_PID=$!
