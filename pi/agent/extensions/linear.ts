@@ -460,6 +460,7 @@ const actions: Record<string, (ws: Workspace, p: any, signal: Sig) => Promise<st
 		const input: any = { teamId, title: p.title };
 		if (p.description) input.description = p.description;
 		if (p.priority != null) input.priority = Number(p.priority);
+		if (p.project_id) input.projectId = p.project_id;
 
 		const [stateId, assigneeId, labelIds, parent] = await Promise.all([
 			p.state ? resolveState(ws, teamId, p.state, signal) : undefined,
@@ -483,6 +484,7 @@ const actions: Record<string, (ws: Workspace, p: any, signal: Sig) => Promise<st
 		if (p.title) input.title = p.title;
 		if (p.description) input.description = p.description;
 		if (p.priority != null) input.priority = Number(p.priority);
+		if (p.project_id) input.projectId = p.project_id === "none" ? null : p.project_id;
 
 		const [stateId, assigneeId, labelIds, parent] = await Promise.all([
 			p.state ? resolveState(ws, teamId, p.state, signal) : undefined,
@@ -498,7 +500,7 @@ const actions: Record<string, (ws: Workspace, p: any, signal: Sig) => Promise<st
 
 		if (!Object.keys(input).length) {
 			throw new Error(
-				"No fields to update. Provide title, description, state, assignee, priority, labels, or parent_id.",
+				"No fields to update. Provide title, description, state, assignee, priority, labels, project_id, or parent_id.",
 			);
 		}
 		const data = await gql(ws, UPDATE_ISSUE, { id, input }, signal);
@@ -645,7 +647,7 @@ const Params = Type.Object({
 			'"list_projects" — recent projects; ' +
 			'"get_project" — single project detail; ' +
 			'"create_issue" — new issue (gated); ' +
-			'"update_issue" — update fields incl. parent_id (gated); ' +
+			'"update_issue" — update fields incl. parent_id, project_id (gated); ' +
 			'"add_comment" — add comment (ungated); ' +
 			'"add_relation" / "remove_relation" — manage related/blocks/duplicate links (ungated, metadata); ' +
 			'"create_project_update" — post a project update with health (gated).',
@@ -662,7 +664,12 @@ const Params = Type.Object({
 		}),
 	),
 	project_id: Type.Optional(
-		Type.String({ description: "Project UUID (required for get_project, create_project_update)." }),
+		Type.String({
+			description:
+				"Project UUID or URL slug (e.g. '208c058e8669'). Required for get_project, create_project_update. " +
+				"Optional on create_issue and update_issue to set/move the issue's project. " +
+				"Pass 'none' in update_issue to clear an existing project assignment.",
+		}),
 	),
 	title: Type.Optional(Type.String({ description: "Issue title (required for create_issue)." })),
 	description: Type.Optional(Type.String({ description: "Issue description in markdown." })),
