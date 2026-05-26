@@ -1,6 +1,11 @@
 # --- Early local overrides (not tracked, runs before everything) ---
 [[ -f ~/.zshrc.pre.local ]] && source ~/.zshrc.pre.local
 
+# peer host for `gust push` (see just/user.justfile). Respect any pre-set value
+# from ~/.zshrc.pre.local or parent env.
+: "${PEER_HOST:=jrgens-macbook-air}"
+export PEER_HOST
+
 # --- Completions ---
 autoload -Uz compinit && compinit
 zstyle ':completion:*' menu select

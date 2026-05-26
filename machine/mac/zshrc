@@ -8,6 +8,11 @@
 # off by default (set in ~/.zshrc.pre.local there if desired).
 export DOTFILES_FRESHNESS=1
 
+# peer host for `gust push` (see just/user.justfile). Respect any pre-set value
+# from ~/.zshrc.pre.local or parent env.
+: "${PEER_HOST:=oracle}"
+export PEER_HOST
+
 # --- Homebrew ---
 eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || /usr/local/bin/brew shellenv 2>/dev/null)"
 

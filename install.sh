@@ -469,6 +469,15 @@ if [[ "$MACHINE" == "mac" ]]; then
   _link "$DOTFILES/zsh/dotfiles-freshness.zsh" ~/.config/zsh/
 fi
 
+# --- Shared bin scripts ---
+# Prune symlinks left by the abandoned `bin/gust` / `bin/peer` approach
+# (now superseded by the `push` recipe in just/user.justfile, 2026-05-26).
+# Gate on -L so a user's hand-authored file at the same path is preserved
+# — `~/.local/bin/` is shared turf, not exclusively dotfiles-managed.
+mkdir -p ~/.local/bin
+for _f in ~/.local/bin/gust ~/.local/bin/peer; do [ -L "$_f" ] && rm -f "$_f"; done
+unset _f
+
 # --- Mac-only ---
 if [[ "$MACHINE" == "mac" ]]; then
   mkdir -p ~/.ssh

@@ -43,6 +43,67 @@ update:
     pnpm self-update
     pnpm -g update
 
+# --- Networking / peers ---
+
+[doc("Send <path> to $PEER_HOST (rsync over SSH). Mirrors paths under $HOME → ~/… on peer.")]
+[positional-arguments]
+push path destination='':
+    #!/usr/bin/env bash
+    # Default destination mirrors the local path: paths under $HOME map to
+    # ~/… on the peer (remote shell expands ~ for that user's home, so
+    # different remote usernames are fine). Paths outside $HOME require an
+    # explicit destination — we don't silently target absolute remote paths.
+    #
+    # Trailing slash on <path> keeps rsync's "contents of dir" semantics.
+    # `.git` is always excluded; honours a local .gitignore if present.
+    # Set DRY_RUN=1 to preview without transferring.
+    #
+    # Prereq: rsync ≥ 3.0 (the Brewfile installs GNU rsync on mac; the VM's
+    # apt rsync is 3.2+). Peer must be reachable as `ssh "$PEER_HOST"` with
+    # this machine's pubkey in the peer's ~/.ssh/authorized_keys.
+    set -euo pipefail
+    cd {{quote(invocation_directory())}}
+    : "${PEER_HOST:?set PEER_HOST in zshrc (mac→oracle, vm→<mac tailscale name>)}"
+
+    src="$1"
+    dst="${2:-}"
+    home="${HOME%/}"
+
+    # Reject option-shaped args. The `--` separator on the rsync line below
+    # protects against rsync flag-parsing, but a literal leading dash still
+    # confuses error output — fail early with a hint.
+    case "$src" in -*) echo "push: src may not start with '-' (try ./$src)" >&2; exit 2 ;; esac
+    case "$dst" in -*) echo "push: destination may not start with '-'" >&2; exit 2 ;; esac
+
+    [ -e "$src" ] || [ -L "$src" ] || { echo "push: no such path: $src" >&2; exit 1; }
+
+    # Normalise trailing slashes: capture intent, collapse 1+ trailing slashes
+    # to a single canonical one. POSIX `${var%/}` strips one; loop for runs.
+    case "$src" in */) trail="/" ;; *) trail="" ;; esac
+    while [ "$src" != "${src%/}" ]; do src="${src%/}"; done
+    [ -n "$trail" ] && src="$src/"
+
+    if [ -z "$dst" ]; then
+      abs="$(cd "$(dirname "$src")" && pwd)/$(basename "$src")$trail"
+      case "$abs" in
+        "$home"/*) dst="${abs#"$home"/}" ;;  # relative to remote $HOME (rsync host:relpath semantics)
+        "$home")   dst="" ;;
+        *)         echo "push: $abs is outside \$HOME; pass an explicit destination" >&2; exit 2 ;;
+      esac
+    else
+      # If the caller passed ~ in the destination, strip it — rsync's -s flag
+      # disables remote shell expansion, so a literal ~ would be sent verbatim.
+      case "$dst" in
+        "~"/*) dst="${dst#"~/"}" ;;
+        "~")   dst="" ;;
+      esac
+    fi
+
+    flags=(-avz --partial --progress -s --mkpath --filter=':- .gitignore' --exclude='.git')
+    [ "${DRY_RUN:-}" = "1" ] && flags+=(-n)
+
+    exec rsync "${flags[@]}" -- "$src" "$PEER_HOST:$dst"
+
 # Show external IP + listening ports — quick "what's this machine doing".
 net:
     @echo "External: $(curl -s ifconfig.me)"

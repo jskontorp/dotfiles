@@ -24,6 +24,7 @@ brew "zsh-syntax-highlighting"
 # Dev tools
 brew "tmux"
 brew "mosh"           # low-latency shell with local echo (used over Tailscale)
+brew "rsync"          # GNU rsync ≥ 3 — Apple's openrsync lacks --secluded-args (needed by `gust push`)
 brew "neovim"
 brew "node"
 brew "pnpm"
