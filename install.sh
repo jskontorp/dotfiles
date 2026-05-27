@@ -490,6 +490,9 @@ fi
 
 # --- VM-only ---
 if [[ "$MACHINE" == "vm" ]]; then
+  mkdir -p ~/.ssh
+  _link "$M/ssh/config" ~/.ssh/config
+
   rm -f ~/.local/bin/sv  # graveyarded 2026-05-12
 fi
 

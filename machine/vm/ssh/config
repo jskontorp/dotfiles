@@ -1,0 +1,5 @@
+Host jrgens-macbook-air
+    User jorgens.kontorp
+    SetEnv TERM=xterm-256color
+    ServerAliveInterval 15
+    ServerAliveCountMax 3
