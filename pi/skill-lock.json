@@ -134,6 +134,13 @@
       "sourceUrl": "https://github.com/obra/superpowers",
       "skillPath": "skills/executing-plans/SKILL.md",
       "skillFolderHash": "6efe32c9e2dd002d0c394e861e0529675d1ab32e"
+    },
+    "last30days": {
+      "source": "mvanhorn/last30days-skill",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/mvanhorn/last30days-skill",
+      "skillPath": "skills/last30days/SKILL.md",
+      "skillFolderHash": "1e03af19e0ad435ee6d227a3593b0c6e5d2ecbe8"
     }
   },
   "dismissed": {
