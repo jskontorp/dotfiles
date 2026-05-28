@@ -19,7 +19,7 @@ If a subagent dispatch returns a partial-response or stream-idle error: check fo
 
 When delegating adversarial review to sub-agents (find overclaims, missed concerns, lies in PR comments / commit messages / reply drafts), include **resolved+outdated** review threads in the audit surface — not just open or in-flight ones. A resolution can itself be wrong: author over-reverting on bot speculation, premature self-closure, claim-without-counterparty-confirmation. The probe is *"was the resolution correct?"*, not *"is there an unaddressed concern?"*. (Evidence: VOLVE-908 / PR #1335, 2026-05-20 — Cursor thread `CwB_y` resolved+outdated, contained over-revert of CTO commit `0238653d` in another agent's code surface; escaped first-round multi-agent review because resolved threads were treated as already-cleared; un-revert landed in `e0f650f2` after user catch.)
 
-For broader long-plan execution discipline (ledger split, pre-compact protocol, reviewer-brief sizing), see [`ideas/long-plan-execution/design.md`](../../ideas/long-plan-execution/design.md). Revisit the question of promoting these notes into a skill on the trigger documented there.
+For broader long-plan execution discipline (ledger split, pre-compact protocol, reviewer-brief sizing), see [`working/long-plan-execution/design.md`](../../working/long-plan-execution/design.md). Revisit the question of promoting these notes into a skill on the trigger documented there.
 
 Call multiple tools in a single response when there are no dependencies between the calls. If two reads or searches are independent, run them in parallel. An edit (or write) depends on the read of the same file: read first, edit in the next response.
 
@@ -82,15 +82,15 @@ Three layers, three jobs. Don't conflate them.
 
 **Per-batch session ledger** — mid-batch working memory. For multi-phase work (≥3 phases, or any work spanning a `/compact` or `/clear`):
 
-- Location: `ideas/batches/YYYY-MM-DD-<slug>/state.md`, committed alongside the work. (Versioned, survives worktree removal, visible from sibling worktrees via `git log -- ideas/batches/`.)
+- Location: `working/batches/YYYY-MM-DD-<slug>/state.md`, committed alongside the work. (Versioned, survives worktree removal, visible from sibling worktrees via `git log -- working/batches/`.)
 - Single file. Two fields initially:
   - **Standing Directives** — out-of-band user guidance that must survive compaction. Review intensity per ticket, bundling rules, repo-specific gotchas the user named verbally. Append on every directive, never auto-delete.
   - **Verification invariants** — what "green" means for this batch. Which commands count, what counts as expected-failing, the deferred-failure inventory. Set at batch start; update only on invariant change.
 - Write protocol: blocking at end of every phase. A phase isn't complete until the ledger reflects it. Local file edit — not outbound communication, no per-call approval needed.
-- Read protocol: on user keyword ("resume", "where were we", "continue"), and on session start if `ideas/batches/<recent-date>-*/state.md` exists without a `closed:` marker in its header.
+- Read protocol: on user keyword ("resume", "where were we", "continue"), and on session start if `working/batches/<recent-date>-*/state.md` exists without a `closed:` marker in its header.
 - End of batch: append `closed: YYYY-MM-DD` to the header, commit alongside the final ticket's landing. Keep the file indefinitely — it's the cheapest forensic surface for "how did that batch go?"
-- See [`ideas/long-plan-execution/design.md`](../../ideas/long-plan-execution/design.md) for the larger ledger design. This section ships a minimal slice of §3.3 + §3.4; the rest of design.md remains reference, activated incrementally as evidence demands. Position / Up-next / Open decisions / `audit.md` / pre-compact protocol / multi-repo coordination are deliberately deferred to v2.
-- **Single-machine assumption.** The ledger format assumes one machine writes a given batch's `state.md` at a time. Concurrent multi-machine writes (Mac + VM writing the same `state.md`) produce non-FF push failures and rebase-mangled ledgers. `just sync` surfaces this passively: if a pulled commit touches any `ideas/batches/**/state.md`, the recipe prints a banner pointing at JSK-49 (which carries the three deferred design options: per-machine filenames, strict-push-per-phase, or accept the risk as-is)—the current shipped behaviour is option (a), accept the risk. Push before machine-switch is the user-side discipline that defers FM-9 indefinitely.
+- See [`working/long-plan-execution/design.md`](../../working/long-plan-execution/design.md) for the larger ledger design. This section ships a minimal slice of §3.3 + §3.4; the rest of design.md remains reference, activated incrementally as evidence demands. Position / Up-next / Open decisions / `audit.md` / pre-compact protocol / multi-repo coordination are deliberately deferred to v2.
+- **Single-machine assumption.** The ledger format assumes one machine writes a given batch's `state.md` at a time. Concurrent multi-machine writes (Mac + VM writing the same `state.md`) produce non-FF push failures and rebase-mangled ledgers. `just sync` surfaces this passively: if a pulled commit touches any `working/batches/**/state.md`, the recipe prints a banner pointing at JSK-49 (which carries the three deferred design options: per-machine filenames, strict-push-per-phase, or accept the risk as-is)—the current shipped behaviour is option (a), accept the risk. Push before machine-switch is the user-side discipline that defers FM-9 indefinitely.
 
 # Standards
 

@@ -48,7 +48,7 @@ cd ~/code/personal/dotfiles_worktrees/<slug>
 
 ## Workflow rules
 
-- Plans, recaps, design notes go under `ideas/`, not repo root.
+- Plans, recaps, design notes go under `working/`, not repo root.
 - Never reach for `npx skills add` — it bypasses `pi/skill-lock.json`. Use `just add-skill` / `just update-skill` / `just new-skill`.
 - When reporting verification, state the exact command run and its outcome. Don't generalise from "I edited the file" to "tests pass".
 - Before declaring done: did this work surface a failure mode not in "Known regression classes"? If yes, propose a one-line addition with the SHA. If no, move on.

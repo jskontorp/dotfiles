@@ -311,7 +311,7 @@ link:
 # the pulled range touches agent-policy surface (AGENTS.md / extensions /
 # Claude settings / hooks) so live agent sessions get a restart hint.
 # Surfaces a separate banner when the pulled range touches any
-# `ideas/batches/**/state.md` (signals concurrent multi-machine ledger
+# `working/batches/**/state.md` (signals concurrent multi-machine ledger
 # writes, flagged in JSK-49 for revisit).
 sync:
     #!/usr/bin/env bash
@@ -376,7 +376,7 @@ sync:
     fi
     # Banner 2: ledger writes from another machine. Single-machine ledger
     # is the documented assumption; concurrent writes trigger JSK-XX.
-    if printf '%s\n' "$pulled" | grep -qE '^ideas/batches/.*/state\.md$'; then
+    if printf '%s\n' "$pulled" | grep -qE '^working/batches/.*/state\.md$'; then
       printf "\n⚠ ledger state changed in pulled range — indicates concurrent multi-machine batches.\n" >&2
       printf "   Current ledger design assumes single-machine writes; revisit JSK-49 if this is happening regularly.\n" >&2
     fi
