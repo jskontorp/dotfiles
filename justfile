@@ -500,6 +500,8 @@ check:
     bash {{DOTFILES}}/test/check-regression-provenance.sh
     printf "\ngit-env isolation (JSK-44):\n"
     bash {{DOTFILES}}/test/check-git-env-isolation.sh
+    printf "\npre-commit self-check (JSK-46):\n"
+    bash {{DOTFILES}}/test/check-pre-commit-self-check.sh
     printf "\nhook chain (JSK-43):\n"
     bash {{DOTFILES}}/test/check-hook-chain.sh
     printf "\nextensions (typescript):\n"
