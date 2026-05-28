@@ -617,3 +617,9 @@ if [[ -d "$DOTFILES/.git" ]]; then
 fi
 
 echo "✅ Dotfiles linked ($MACHINE)"
+echo
+echo "⚠️  Restart any running pi sessions to pick up the latest extensions."
+echo "    Long-lived pi processes silently drop the destructive-gate hook"
+echo "    (and any other tool_call hook) after a session worth of activity."
+echo "    See AGENTS.md 'Stale extension-hook dispatch in long-lived pi'."
+echo "    Restart with: /quit in pi, then \`pi\` again."
