@@ -25,11 +25,11 @@
           "reasoning": true,
           "compat": { "forceAdaptiveThinking": true },
           "thinkingLevelMap": {
-            "minimal": "medium",
-            "low": "medium",
+            "minimal": null,
+            "low": null,
             "medium": "medium",
-            "high": "medium",
-            "xhigh": "medium"
+            "high": null,
+            "xhigh": null
           },
           "input": ["text", "image"],
           "contextWindow": 1000000,
