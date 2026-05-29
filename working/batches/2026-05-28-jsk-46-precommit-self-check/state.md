@@ -2,6 +2,7 @@
 slug: jsk-46-precommit-self-check
 linear: JSK-46
 started: 2026-05-28
+closed: 2026-05-28
 ---
 
 ## Standing Directives
