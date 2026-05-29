@@ -24,7 +24,13 @@
           "api": "anthropic-messages",
           "reasoning": true,
           "compat": { "forceAdaptiveThinking": true },
-          "thinkingLevelMap": { "xhigh": "xhigh" },
+          "thinkingLevelMap": {
+            "minimal": "medium",
+            "low": "medium",
+            "medium": "medium",
+            "high": "medium",
+            "xhigh": "medium"
+          },
           "input": ["text", "image"],
           "contextWindow": 1000000,
           "maxTokens": 64000,
