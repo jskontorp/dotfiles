@@ -7,6 +7,14 @@
           "name": "Claude Opus 4.7",
           "api": "anthropic-messages",
           "reasoning": true,
+          "compat": { "forceAdaptiveThinking": true },
+          "thinkingLevelMap": {
+            "minimal": null,
+            "low": null,
+            "medium": "medium",
+            "high": null,
+            "xhigh": null
+          },
           "input": ["text", "image"],
           "contextWindow": 1000000,
           "maxTokens": 64000,
