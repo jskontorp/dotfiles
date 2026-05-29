@@ -33,6 +33,7 @@ jobs:
           bash test/check-silencing-gate.sh
           bash test/check-hook-chain.sh
           bash test/check-git-env-isolation.sh
+          bash test/check-pre-commit-self-check.sh
           bash test/check-canonical-path.sh
           bash test/check-regression-provenance.sh
           bash test/check-destructive-gate.sh

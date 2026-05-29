@@ -19,6 +19,132 @@ REPO_ROOT="$(git rev-parse --show-toplevel)"
 CANONICAL_DIR="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
 SECRET_GATE_LIB="$CANONICAL_DIR/git/lib/secret-gate.sh"
 
+# --- staged-index self-check (JSK-46) ---
+# Runtime guard for the GIT_INDEX_FILE poisoning regression class: a hook
+# subprocess must not mutate the staged index while pre-commit is running.
+# Snapshot the full index (mode + blob + stage + path) at entry and compare
+# again at EXIT. The guard is intentionally unconditional: this repo does
+# not use auto-format-and-restage pre-commit hooks.
+pre_commit_self_check_snapshot() {
+  git ls-files --stage -z > "$1"
+}
+
+pre_commit_self_check_snapshot_human() {
+  git ls-files --stage > "$1"
+}
+
+pre_commit_self_check_entry_present() {
+  local needle="$1"
+  local candidate
+  shift
+  for candidate in "$@"; do
+    [[ "$candidate" == "$needle" ]] && return 0
+  done
+  return 1
+}
+
+pre_commit_self_check_print_path_once() {
+  local path="$1"
+  local seen
+  for seen in "${pre_commit_self_check_seen_paths[@]}"; do
+    [[ "$seen" == "$path" ]] && return 0
+  done
+  pre_commit_self_check_seen_paths+=("$path")
+  pre_commit_self_check_seen_count=$((pre_commit_self_check_seen_count + 1))
+  printf "   " >&2
+  printf "%q\n" "$path" >&2
+}
+
+pre_commit_self_check_report_changed_paths() {
+  local pre_snapshot="$1"
+  local post_snapshot="$2"
+  local pre_entries=()
+  local post_entries=()
+  local entry path
+
+  while IFS= read -r -d '' entry; do pre_entries+=("$entry"); done < "$pre_snapshot"
+  while IFS= read -r -d '' entry; do post_entries+=("$entry"); done < "$post_snapshot"
+
+  # Bash 3.2 + `set -u` treats an empty array expansion as unbound, so keep
+  # an impossible-path sentinel (empty string) and track the real count.
+  pre_commit_self_check_seen_paths=("")
+  pre_commit_self_check_seen_count=0
+  for entry in "${pre_entries[@]}"; do
+    if ! pre_commit_self_check_entry_present "$entry" "${post_entries[@]}"; then
+      path="${entry#*$'\t'}"
+      pre_commit_self_check_print_path_once "$path"
+    fi
+  done
+  for entry in "${post_entries[@]}"; do
+    if ! pre_commit_self_check_entry_present "$entry" "${pre_entries[@]}"; then
+      path="${entry#*$'\t'}"
+      pre_commit_self_check_print_path_once "$path"
+    fi
+  done
+
+  if [[ $pre_commit_self_check_seen_count -eq 0 ]]; then
+    printf "   (unable to isolate paths; raw snapshots differ)\n" >&2
+  fi
+}
+
+pre_commit_self_check_print_snapshot() {
+  local snapshot="$1"
+  if [[ -s "$snapshot" ]]; then
+    sed 's/^/   /' "$snapshot" >&2 || true
+  else
+    printf "   (empty)\n" >&2
+  fi
+}
+
+pre_commit_self_check_on_exit() {
+  local original_status="$?"
+  trap - EXIT
+
+  if ! pre_commit_self_check_snapshot "$SELF_CHECK_POST" || ! pre_commit_self_check_snapshot_human "$SELF_CHECK_POST_HUMAN"; then
+    printf "❌ pre-commit self-check: unable to snapshot staged index at hook exit — refusing commit.\n" >&2
+    printf "   This guard catches hook subprocesses that mutate Git's index; see AGENTS.md → GIT_INDEX_FILE poisoning.\n" >&2
+    rm -rf "$SELF_CHECK_TMP" || true
+    exit 1
+  fi
+
+  if cmp -s "$SELF_CHECK_PRE" "$SELF_CHECK_POST"; then
+    rm -rf "$SELF_CHECK_TMP" || true
+    exit "$original_status"
+  fi
+
+  printf "❌ pre-commit self-check: staged index changed while the hook was running.\n" >&2
+  printf "   Pre-commit hooks in this repo must not add, remove, or re-stage files.\n" >&2
+  printf "   Likely cause: a hook subprocess inherited Git index env vars or ran git add/rm.\n" >&2
+  printf "   See AGENTS.md → GIT_INDEX_FILE poisoning from pre-commit hook subprocesses (JSK-46).\n" >&2
+  printf "\nAffected path(s):\n" >&2
+  pre_commit_self_check_report_changed_paths "$SELF_CHECK_PRE" "$SELF_CHECK_POST"
+  printf "\nBefore (git ls-files --stage):\n" >&2
+  pre_commit_self_check_print_snapshot "$SELF_CHECK_PRE_HUMAN"
+  printf "\nAfter (git ls-files --stage):\n" >&2
+  pre_commit_self_check_print_snapshot "$SELF_CHECK_POST_HUMAN"
+  printf "\nRemediation:\n" >&2
+  printf "  • Inspect the index with git status / git diff --cached.\n" >&2
+  printf "  • Fix the hook helper so it does not mutate the caller's index.\n" >&2
+  printf "  • For tmprepo tests, unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE GIT_OBJECT_DIRECTORY GIT_COMMON_DIR before creating nested repos.\n" >&2
+  rm -rf "$SELF_CHECK_TMP" || true
+  exit 1
+}
+
+SELF_CHECK_TMP="$(mktemp -d -t precommit-self-check.XXXXXX)" || {
+  printf "❌ pre-commit self-check: failed to create temp dir — refusing commit.\n" >&2
+  exit 1
+}
+SELF_CHECK_PRE="$SELF_CHECK_TMP/pre.index"
+SELF_CHECK_POST="$SELF_CHECK_TMP/post.index"
+SELF_CHECK_PRE_HUMAN="$SELF_CHECK_TMP/pre.txt"
+SELF_CHECK_POST_HUMAN="$SELF_CHECK_TMP/post.txt"
+if ! pre_commit_self_check_snapshot "$SELF_CHECK_PRE" || ! pre_commit_self_check_snapshot_human "$SELF_CHECK_PRE_HUMAN"; then
+  printf "❌ pre-commit self-check: unable to snapshot staged index at hook entry — refusing commit.\n" >&2
+  rm -rf "$SELF_CHECK_TMP" || true
+  exit 1
+fi
+trap pre_commit_self_check_on_exit EXIT
+
 # --- secret-path gate (JSK-35) ---
 # Refuse staged paths that look like secrets (.env*, *.pem, id_*, …).
 # Pattern set lives in git/lib/secret-gate.sh; same set is mirrored in
