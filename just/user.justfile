@@ -100,6 +100,12 @@ push path destination='':
     fi
 
     flags=(-avz --partial --progress -s --mkpath --filter=':- .gitignore' --exclude='.git')
+    # macOS default /usr/bin/rsync is openrsync, which rejects -s (and other
+    # GNU-only flags). Brew's GNU rsync lives at /opt/homebrew/bin/rsync
+    # (ARM) or /usr/local/bin/rsync (Intel), but non-interactive SSH PATH on
+    # macOS is /usr/bin:/bin:/usr/sbin:/sbin — brew dirs missing. Prefix
+    # both onto remote PATH; Linux peers harmlessly ignore the absent dirs.
+    flags+=(--rsync-path='PATH=/opt/homebrew/bin:/usr/local/bin:$PATH rsync')
     [ "${DRY_RUN:-}" = "1" ] && flags+=(-n)
 
     exec rsync "${flags[@]}" -- "$src" "$PEER_HOST:$dst"
