@@ -1,5 +1,6 @@
 # Core CLI tools
 brew "git"
+brew "git-lfs"
 brew "gh"
 brew "curl"
 brew "wget"
@@ -28,6 +29,7 @@ brew "rsync"          # GNU rsync ≥ 3 — Apple's openrsync lacks --secluded-a
 brew "neovim"
 brew "node"
 brew "pnpm"
+brew "bun"
 brew "just"
 brew "shellcheck"       # pre-commit lint for *.sh
 brew "libpq"           # psql/pg_dump client (keg-only; PATH set in zsh/core.zsh)

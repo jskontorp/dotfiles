@@ -24,3 +24,8 @@
 	helper = !/usr/bin/env gh auth git-credential
 [alias]
 	forcepull = "!f() { \\\n  branch=$(git rev-parse --abbrev-ref HEAD); \\\n  remote=$(git config branch.\"$branch\".remote); \\\n  merge=$(git config branch.\"$branch\".merge); \\\n  if [ -z \"$remote\" ] || [ -z \"$merge\" ]; then \\\n    echo \"Error: Current branch is not tracking any remote branch.\"; \\\n    return 1; \\\n  fi; \\\n  remote_branch=${merge#refs/heads/}; \\\n  git fetch \"$remote\" \"$remote_branch\" && git reset --hard FETCH_HEAD; \\\n}; f"
+[filter "lfs"]
+	clean = git-lfs clean -- %f
+	smudge = git-lfs smudge -- %f
+	process = git-lfs filter-process
+	required = true
