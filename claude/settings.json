@@ -190,6 +190,7 @@
       "Read(**/*.tfvars.json)"
     ]
   },
+  "model": "claude-fable-5[1m]",
   "hooks": {
     "SessionStart": [
       {
@@ -226,5 +227,6 @@
     }
   },
   "theme": "auto",
-  "skipAutoPermissionPrompt": true
+  "skipAutoPermissionPrompt": true,
+  "effortLevel": "xhigh"
 }
