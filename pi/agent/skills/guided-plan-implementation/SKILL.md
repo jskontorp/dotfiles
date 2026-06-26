@@ -69,7 +69,7 @@ A passing test run is not proof. For the section just handed back, check:
 - **Failure modes** — no swallowed errors, silent fallbacks, or drift from the
   plan's stated contract.
 
-Gaps → name them (file + line + what's missing) and loop back. Clean → advance.
+Gaps → name them (file + line + what's missing) and loop back. Clean → if the section is a logical, committable chunk, sign off with three super-terse commit-message drafts; otherwise advance.
 
 ## Quick reference
 
@@ -79,7 +79,7 @@ Gaps → name them (file + line + what's missing) and loop back. Clean → advan
 | 1 Clarify | Resolved decisions (interview) | Answers |
 | 2 Tests | Failing targeted tests | — |
 | 2 Direct | Below-diff direction (→ full diff on request) | Production code |
-| 3 Verify | Read-the-diff verdict + gaps | Fixes |
+| 3 Verify | Read-the-diff verdict + gaps; three commit-message drafts when the chunk is committable | Fixes |
 
 ## Common mistakes
 
