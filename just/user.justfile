@@ -37,11 +37,34 @@ check:
 skills:
     cd {{DOTFILES}} && just skills
 
-# Update brew + pnpm globals (mac).
+# Update brew + pnpm globals (mac). Steps run independently; failures are
+# collected and reported at the end (exit nonzero if any step failed), so
+# e.g. a broken brew cask can't block the pnpm updates.
 update:
-    brew update && brew upgrade && brew cleanup
-    pnpm self-update
-    pnpm -g update
+    #!/usr/bin/env bash
+    set -uo pipefail
+    FAILED=()
+    step() {
+      local label="$1"; shift
+      echo "📦 $label..."
+      local rc=0
+      "$@" || rc=$?
+      if [ "$rc" -ne 0 ]; then
+        FAILED+=("$label (exit $rc)")
+        echo "  ❌ $label failed (exit $rc) — continuing"
+      fi
+    }
+    step "brew update"      brew update
+    step "brew upgrade"     brew upgrade
+    step "brew cleanup"     brew cleanup
+    step "pnpm self-update" pnpm self-update
+    step "pnpm -g update"   pnpm -g update
+    if [ "${#FAILED[@]}" -gt 0 ]; then
+      echo "⚠️  update finished with ${#FAILED[@]} failure(s):"
+      printf '  ❌ %s\n' "${FAILED[@]}"
+      exit 1
+    fi
+    echo "✅ Done"
 
 # --- Networking / peers ---
 

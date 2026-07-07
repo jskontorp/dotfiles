@@ -29,193 +29,283 @@ init:
 [macos]
 update:
     #!/usr/bin/env bash
-    set -euo pipefail
-    echo "📦 Homebrew..."
-    brew update && brew bundle --file="{{MAC}}/Brewfile" && brew upgrade && brew cleanup
-    echo "📦 global pnpm packages..."
-    # Ensure pnpm's global bin exists + is on PATH for this shell. PNPM_HOME
-    # itself is exported from zsh/core.zsh; we re-export here because `just`
-    # recipes don't inherit interactive-shell config. pnpm ≥10 uses
-    # $PNPM_HOME/bin as its global-bin-dir (older pnpm used $PNPM_HOME).
-    # Creating the dir is what `pnpm setup` would do — we skip `pnpm setup`
-    # to avoid it appending a duplicate PNPM_HOME block to ~/.zshrc.
-    export PNPM_HOME="$HOME/Library/pnpm"
-    export PATH="$PNPM_HOME/bin:$PATH"
-    mkdir -p "$PNPM_HOME/bin"
-    # Legacy package scope was renamed; remove old name if present.
-    pnpm rm -g @mariozechner/pi-coding-agent >/dev/null 2>&1 || true
-    pnpm add -g {{GLOBAL_PNPM}}
+    # No `set -e`: each step runs independently so one broken package (e.g. a
+    # stale Homebrew cask) can't block the rest. Failures are collected and
+    # reported in a summary at the end; exit is nonzero if anything failed.
+    set -uo pipefail
+    FAILED=()
+    step() {
+      local label="$1"; shift
+      echo "📦 $label..."
+      local rc=0
+      "$@" || rc=$?
+      if [ "$rc" -ne 0 ]; then
+        FAILED+=("$label (exit $rc)")
+        echo "  ❌ $label failed (exit $rc) — continuing"
+      fi
+    }
 
-    # Ensure Claude Code's native binary is present (see VM recipe for rationale).
-    # pnpm ≥11 nests global packages under a content-hashed dir, so
-    # `pnpm root -g` no longer points at the package itself — query
-    # `pnpm list -g --parseable` for the resolved path.
-    echo "📦 claude native binary..."
-    CLAUDE_PKG="$(pnpm list -g --parseable 2>/dev/null | grep '/@anthropic-ai/claude-code$' | head -1)"
-    if [[ -n "$CLAUDE_PKG" && -f "$CLAUDE_PKG/install.cjs" ]]; then
-      node "$CLAUDE_PKG/install.cjs" || echo "  ⚠ claude install.cjs failed — run manually: node $CLAUDE_PKG/install.cjs"
-    elif ! claude --version >/dev/null 2>&1; then
-      echo "  ⚠ claude binary not runnable and no install.cjs present."
-      echo "    Try: pnpm install -g --force @anthropic-ai/claude-code"
+    _brew_bundle()  { brew bundle --file="{{MAC}}/Brewfile"; }
+
+    _pnpm_globals() {
+      # Ensure pnpm's global bin exists + is on PATH for this shell. PNPM_HOME
+      # itself is exported from zsh/core.zsh; we re-export here because `just`
+      # recipes don't inherit interactive-shell config. pnpm ≥10 uses
+      # $PNPM_HOME/bin as its global-bin-dir (older pnpm used $PNPM_HOME).
+      # Creating the dir is what `pnpm setup` would do — we skip `pnpm setup`
+      # to avoid it appending a duplicate PNPM_HOME block to ~/.zshrc.
+      export PNPM_HOME="$HOME/Library/pnpm"
+      export PATH="$PNPM_HOME/bin:$PATH"
+      mkdir -p "$PNPM_HOME/bin"
+      # Legacy package scope was renamed; remove old name if present.
+      pnpm rm -g @mariozechner/pi-coding-agent >/dev/null 2>&1 || true
+      pnpm add -g {{GLOBAL_PNPM}}
+    }
+
+    _claude_native() {
+      # Ensure Claude Code's native binary is present (see VM recipe for rationale).
+      # pnpm ≥11 nests global packages under a content-hashed dir, so
+      # `pnpm root -g` no longer points at the package itself — query
+      # `pnpm list -g --parseable` for the resolved path.
+      local pkg
+      pkg="$(pnpm list -g --parseable 2>/dev/null | grep '/@anthropic-ai/claude-code$' | head -1)"
+      if [[ -n "$pkg" && -f "$pkg/install.cjs" ]]; then
+        node "$pkg/install.cjs"
+      elif ! claude --version >/dev/null 2>&1; then
+        echo "  ⚠ claude binary not runnable and no install.cjs present."
+        echo "    Try: pnpm install -g --force @anthropic-ai/claude-code"
+        return 1
+      fi
+    }
+
+    _tmux_plugins() { "$HOME/.tmux/plugins/tpm/bin/install_plugins"; }
+
+    step "brew update"           brew update
+    step "brew bundle"           _brew_bundle
+    step "brew upgrade"          brew upgrade
+    step "brew cleanup"          brew cleanup
+    step "global pnpm packages"  _pnpm_globals
+    step "claude native binary"  _claude_native
+    step "tmux plugins"          _tmux_plugins
+
+    if [ "${#FAILED[@]}" -gt 0 ]; then
+      echo "⚠️  update finished with ${#FAILED[@]} failure(s):"
+      printf '  ❌ %s\n' "${FAILED[@]}"
+      exit 1
     fi
-
-    echo "📦 tmux plugins..."
-    "$HOME/.tmux/plugins/tpm/bin/install_plugins"
     echo "✅ Done"
 
 [linux]
 update:
     #!/usr/bin/env bash
-    set -euo pipefail
+    # No `set -e`: each step runs independently so one broken tool can't block
+    # the rest. Failures are collected and reported in a summary at the end;
+    # exit is nonzero if anything failed. Steps run in the same shell (no
+    # subshell), so exports (PATH, fnm env) persist across steps.
+    set -uo pipefail
     source "{{VM}}/versions.env"
 
-    echo "📦 apt..."
-    sudo apt-get update -qq && sudo apt-get upgrade -y -qq
-    sudo apt-get install -y -qq \
-      zsh git gh curl wget unzip jq fzf \
-      ripgrep fd-find bat \
-      build-essential
-    sudo apt-get autoremove -y -qq
-    sudo ln -sf "$(which fdfind)" /usr/local/bin/fd 2>/dev/null || true
-    sudo ln -sf "$(which batcat)" /usr/local/bin/bat 2>/dev/null || true
-
-    echo "📦 zsh plugins..."
-    ZSH_PLUGINS="$HOME/.local/share/zsh/plugins"
-    mkdir -p "$ZSH_PLUGINS"
-    for plugin in zsh-autosuggestions zsh-syntax-highlighting; do
-      if [[ -d "$ZSH_PLUGINS/$plugin" ]]; then
-        git -C "$ZSH_PLUGINS/$plugin" pull -q
-      else
-        git clone --depth=1 "https://github.com/zsh-users/$plugin" "$ZSH_PLUGINS/$plugin"
+    FAILED=()
+    step() {
+      local label="$1"; shift
+      echo "📦 $label..."
+      local rc=0
+      "$@" || rc=$?
+      if [ "$rc" -ne 0 ]; then
+        FAILED+=("$label (exit $rc)")
+        echo "  ❌ $label failed (exit $rc) — continuing"
       fi
-    done
-
-    _install() { echo "📦 $1..."; }
-
-    # _fetch_binary <name> <url> <binary> [strip-components]
-    # Downloads a tarball, extracts the named binary, installs to /usr/local/bin.
-    _fetch_binary() {
-      local name="$1" url="$2" binary="${3:-$1}" strip="${4:-0}"
-      _install "$name"
-      local tmp=$(mktemp -d)
-      curl -sL "$url" | tar xz --strip-components="$strip" -C "$tmp"
-      sudo mv "$tmp/$binary" /usr/local/bin/"$binary"
-      rm -rf "$tmp"
     }
 
-    _install neovim
-    _tmp=$(mktemp -d)
-    curl -sL "https://github.com/neovim/neovim/releases/latest/download/nvim-linux-arm64.tar.gz" | tar xz -C "$_tmp"
-    sudo rm -rf /opt/nvim && sudo mv "$_tmp/nvim-linux-arm64" /opt/nvim
-    sudo ln -sf /opt/nvim/bin/nvim /usr/local/bin/nvim
-    rm -rf "$_tmp"
+    _apt() {
+      sudo apt-get update -qq && sudo apt-get upgrade -y -qq && \
+      sudo apt-get install -y -qq \
+        zsh git gh curl wget unzip jq fzf \
+        ripgrep fd-find bat \
+        build-essential && \
+      sudo apt-get autoremove -y -qq
+      local rc=$?
+      sudo ln -sf "$(which fdfind)" /usr/local/bin/fd 2>/dev/null || true
+      sudo ln -sf "$(which batcat)" /usr/local/bin/bat 2>/dev/null || true
+      return $rc
+    }
 
-    BAT_VERSION=$(curl -s https://api.github.com/repos/sharkdp/bat/releases/latest | grep tag_name | cut -d'"' -f4)
-    _fetch_binary bat \
-      "https://github.com/sharkdp/bat/releases/download/${BAT_VERSION}/bat-${BAT_VERSION}-aarch64-unknown-linux-gnu.tar.gz" \
-      bat 1
-    bat cache --build 2>/dev/null
+    _zsh_plugins() {
+      local rc=0
+      ZSH_PLUGINS="$HOME/.local/share/zsh/plugins"
+      mkdir -p "$ZSH_PLUGINS"
+      for plugin in zsh-autosuggestions zsh-syntax-highlighting; do
+        if [[ -d "$ZSH_PLUGINS/$plugin" ]]; then
+          git -C "$ZSH_PLUGINS/$plugin" pull -q || rc=1
+        else
+          git clone --depth=1 "https://github.com/zsh-users/$plugin" "$ZSH_PLUGINS/$plugin" || rc=1
+        fi
+      done
+      return $rc
+    }
 
-    EZA_VERSION=$(curl -s https://api.github.com/repos/eza-community/eza/releases/latest | grep tag_name | cut -d'"' -f4)
-    _fetch_binary eza \
-      "https://github.com/eza-community/eza/releases/download/${EZA_VERSION}/eza_aarch64-unknown-linux-gnu.tar.gz" \
-      eza
+    # _fetch_binary <url> <binary> [strip-components]
+    # Downloads a tarball, extracts the named binary, installs to /usr/local/bin.
+    _fetch_binary() {
+      local url="$1" binary="$2" strip="${3:-0}" rc=0
+      local tmp=$(mktemp -d)
+      { curl -sL "$url" | tar xz --strip-components="$strip" -C "$tmp"; } && \
+        sudo mv "$tmp/$binary" /usr/local/bin/"$binary" || rc=1
+      rm -rf "$tmp"
+      return $rc
+    }
 
-    DELTA_VERSION=$(curl -s https://api.github.com/repos/dandavison/delta/releases/latest | grep tag_name | cut -d'"' -f4)
-    _fetch_binary delta \
-      "https://github.com/dandavison/delta/releases/download/${DELTA_VERSION}/delta-${DELTA_VERSION}-aarch64-unknown-linux-gnu.tar.gz" \
-      delta 1
+    _neovim() {
+      local tmp rc=0
+      tmp=$(mktemp -d)
+      { curl -sL "https://github.com/neovim/neovim/releases/latest/download/nvim-linux-arm64.tar.gz" | tar xz -C "$tmp"; } && \
+        sudo rm -rf /opt/nvim && sudo mv "$tmp/nvim-linux-arm64" /opt/nvim && \
+        sudo ln -sf /opt/nvim/bin/nvim /usr/local/bin/nvim || rc=1
+      rm -rf "$tmp"
+      return $rc
+    }
 
-    LAZYGIT_VERSION=$(curl -s https://api.github.com/repos/jesseduffield/lazygit/releases/latest | grep tag_name | cut -d'"' -f4 | sed 's/^v//')
-    _fetch_binary lazygit \
-      "https://github.com/jesseduffield/lazygit/releases/download/v${LAZYGIT_VERSION}/lazygit_${LAZYGIT_VERSION}_Linux_arm64.tar.gz" \
-      lazygit
+    _bat() {
+      local v; v=$(curl -s https://api.github.com/repos/sharkdp/bat/releases/latest | grep tag_name | cut -d'"' -f4) || return 1
+      _fetch_binary "https://github.com/sharkdp/bat/releases/download/${v}/bat-${v}-aarch64-unknown-linux-gnu.tar.gz" bat 1 || return 1
+      bat cache --build 2>/dev/null
+    }
 
-    GLOW_VERSION=$(curl -s https://api.github.com/repos/charmbracelet/glow/releases/latest | grep tag_name | cut -d'"' -f4 | sed 's/^v//')
-    _fetch_binary glow \
-      "https://github.com/charmbracelet/glow/releases/download/v${GLOW_VERSION}/glow_${GLOW_VERSION}_Linux_arm64.tar.gz" \
-      glow 1
+    _eza() {
+      local v; v=$(curl -s https://api.github.com/repos/eza-community/eza/releases/latest | grep tag_name | cut -d'"' -f4) || return 1
+      _fetch_binary "https://github.com/eza-community/eza/releases/download/${v}/eza_aarch64-unknown-linux-gnu.tar.gz" eza
+    }
 
-    _install zoxide
-    curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh
+    _delta() {
+      local v; v=$(curl -s https://api.github.com/repos/dandavison/delta/releases/latest | grep tag_name | cut -d'"' -f4) || return 1
+      _fetch_binary "https://github.com/dandavison/delta/releases/download/${v}/delta-${v}-aarch64-unknown-linux-gnu.tar.gz" delta 1
+    }
 
-    _install starship
-    curl -sS https://starship.rs/install.sh | sh -s -- -y -b "$HOME/.local/bin"
+    _lazygit() {
+      local v; v=$(curl -s https://api.github.com/repos/jesseduffield/lazygit/releases/latest | grep tag_name | cut -d'"' -f4 | sed 's/^v//') || return 1
+      _fetch_binary "https://github.com/jesseduffield/lazygit/releases/download/v${v}/lazygit_${v}_Linux_arm64.tar.gz" lazygit
+    }
 
-    _install "fnm + node"
-    curl -fsSL https://fnm.vercel.app/install | bash -s -- --skip-shell
-    export PATH="$HOME/.local/share/fnm:$PATH"
-    eval "$(fnm env)"
-    fnm install --lts
+    _glow() {
+      local v; v=$(curl -s https://api.github.com/repos/charmbracelet/glow/releases/latest | grep tag_name | cut -d'"' -f4 | sed 's/^v//') || return 1
+      _fetch_binary "https://github.com/charmbracelet/glow/releases/download/v${v}/glow_${v}_Linux_arm64.tar.gz" glow 1
+    }
 
-    _install just
-    rm -f "$HOME/.local/bin/just"
-    curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to "$HOME/.local/bin"
+    _zoxide()   { curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh; }
+    _starship() { curl -sS https://starship.rs/install.sh | sh -s -- -y -b "$HOME/.local/bin"; }
 
-    _install tmux
-    if ! command -v tmux &>/dev/null || [[ "$(tmux -V)" != "tmux $TMUX_VERSION" ]]; then
-      sudo apt-get install -y -qq libevent-dev ncurses-dev bison
-      _tmp=$(mktemp -d)
-      ( cd "$_tmp"
-        curl -sL "https://github.com/tmux/tmux/releases/download/${TMUX_VERSION}/tmux-${TMUX_VERSION}.tar.gz" | tar xz
-        cd "tmux-${TMUX_VERSION}" && ./configure --prefix=/usr/local && make -j"$(nproc)" && sudo make install
-      )
-      rm -rf "$_tmp"
-    else
-      echo "  tmux $(tmux -V | awk '{print $2}') already at target"
+    _fnm_node() {
+      curl -fsSL https://fnm.vercel.app/install | bash -s -- --skip-shell || return 1
+      export PATH="$HOME/.local/share/fnm:$PATH"
+      eval "$(fnm env)" || return 1
+      fnm install --lts
+    }
+
+    _just() {
+      rm -f "$HOME/.local/bin/just"
+      curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to "$HOME/.local/bin"
+    }
+
+    _tmux() {
+      if ! command -v tmux &>/dev/null || [[ "$(tmux -V)" != "tmux $TMUX_VERSION" ]]; then
+        sudo apt-get install -y -qq libevent-dev ncurses-dev bison || return 1
+        local tmp rc=0
+        tmp=$(mktemp -d)
+        ( cd "$tmp" &&
+          curl -sL "https://github.com/tmux/tmux/releases/download/${TMUX_VERSION}/tmux-${TMUX_VERSION}.tar.gz" | tar xz &&
+          cd "tmux-${TMUX_VERSION}" && ./configure --prefix=/usr/local && make -j"$(nproc)" && sudo make install
+        ) || rc=1
+        rm -rf "$tmp"
+        return $rc
+      else
+        echo "  tmux $(tmux -V | awk '{print $2}') already at target"
+      fi
+    }
+
+    _uv() { curl -LsSf https://astral.sh/uv/install.sh | sh; }
+
+    _docker() {
+      if ! command -v docker &>/dev/null; then
+        { curl -fsSL https://get.docker.com | sh; } || return 1
+        sudo usermod -aG docker "$USER"
+        echo "  ⚠ Log out and back in for docker group"
+      else
+        echo "  docker $(docker --version | awk '{print $3}' | tr -d ',') already installed"
+      fi
+    }
+
+    _pnpm() {
+      # The standalone installer drops the `pnpm` binary at $PNPM_HOME/pnpm,
+      # while pnpm ≥10 places globally-added shims under $PNPM_HOME/bin
+      # (older pnpm used $PNPM_HOME for both). Keep both on PATH, but prefer
+      # $PNPM_HOME/bin so modern shims win when legacy shims still exist.
+      export PNPM_HOME="$HOME/.local/share/pnpm"
+      export PATH="$PNPM_HOME/bin:$PNPM_HOME:$PATH"
+      mkdir -p "$PNPM_HOME/bin"
+      curl -fsSL https://get.pnpm.io/install.sh | SHELL=/bin/bash sh -
+    }
+
+    _pnpm_globals() {
+      # Legacy package scope was renamed; remove old name if present.
+      pnpm rm -g @mariozechner/pi-coding-agent >/dev/null 2>&1 || true
+      pnpm add -g {{GLOBAL_PNPM}}
+    }
+
+    _claude_native() {
+      # Claude Code ships a native binary via a postinstall script (install.cjs).
+      # pnpm may skip postinstalls (--ignore-scripts) or optional deps
+      # (--omit=optional), leaving `claude` launchable but failing with
+      # "native binary not installed" at runtime. Running install.cjs
+      # explicitly is idempotent and fixes both cases. Newer versions ship
+      # install.cjs inside the package; if absent (older version), verify
+      # runtime works and warn.
+      # pnpm ≥11 nests global packages under a content-hashed dir; query
+      # `pnpm list -g --parseable` instead of joining onto `pnpm root -g`.
+      local pkg
+      pkg="$(pnpm list -g --parseable 2>/dev/null | grep '/@anthropic-ai/claude-code$' | head -1)"
+      if [[ -n "$pkg" && -f "$pkg/install.cjs" ]]; then
+        node "$pkg/install.cjs"
+      elif ! claude --version >/dev/null 2>&1; then
+        echo "  ⚠ claude binary not runnable and no install.cjs present."
+        echo "    Try: pnpm install -g --force @anthropic-ai/claude-code"
+        return 1
+      fi
+    }
+
+    _tmux_plugins() { "$HOME/.tmux/plugins/tpm/bin/install_plugins"; }
+
+    _cleanup() {
+      [[ -d "$HOME/.oh-my-zsh" ]] && rm -rf "$HOME/.oh-my-zsh" && echo "  removed ~/.oh-my-zsh"
+      dpkg -l bat &>/dev/null && sudo apt-get remove -y -qq bat && echo "  removed apt bat"
+      return 0
+    }
+
+    step "apt"                   _apt
+    step "zsh plugins"           _zsh_plugins
+    step "neovim"                _neovim
+    step "bat"                   _bat
+    step "eza"                   _eza
+    step "delta"                 _delta
+    step "lazygit"               _lazygit
+    step "glow"                  _glow
+    step "zoxide"                _zoxide
+    step "starship"              _starship
+    step "fnm + node"            _fnm_node
+    step "just"                  _just
+    step "tmux"                  _tmux
+    step "uv"                    _uv
+    step "docker"                _docker
+    step "pnpm"                  _pnpm
+    step "global pnpm packages"  _pnpm_globals
+    step "claude native binary"  _claude_native
+    step "tmux plugins"          _tmux_plugins
+    step "cleanup"               _cleanup
+
+    if [ "${#FAILED[@]}" -gt 0 ]; then
+      echo "⚠️  update finished with ${#FAILED[@]} failure(s):"
+      printf '  ❌ %s\n' "${FAILED[@]}"
+      exit 1
     fi
-
-    _install uv
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-
-    _install docker
-    if ! command -v docker &>/dev/null; then
-      curl -fsSL https://get.docker.com | sh
-      sudo usermod -aG docker "$USER"
-      echo "  ⚠ Log out and back in for docker group"
-    else
-      echo "  docker $(docker --version | awk '{print $3}' | tr -d ',') already installed"
-    fi
-
-    _install pnpm
-    # The standalone installer drops the `pnpm` binary at $PNPM_HOME/pnpm,
-    # while pnpm ≥10 places globally-added shims under $PNPM_HOME/bin
-    # (older pnpm used $PNPM_HOME for both). Keep both on PATH, but prefer
-    # $PNPM_HOME/bin so modern shims win when legacy shims still exist.
-    export PNPM_HOME="$HOME/.local/share/pnpm"
-    export PATH="$PNPM_HOME/bin:$PNPM_HOME:$PATH"
-    mkdir -p "$PNPM_HOME/bin"
-    curl -fsSL https://get.pnpm.io/install.sh | SHELL=/bin/bash sh -
-    echo "📦 global pnpm packages..."
-    # Legacy package scope was renamed; remove old name if present.
-    pnpm rm -g @mariozechner/pi-coding-agent >/dev/null 2>&1 || true
-    pnpm add -g {{GLOBAL_PNPM}}
-
-    # Claude Code ships a native binary via a postinstall script (install.cjs).
-    # pnpm may skip postinstalls (--ignore-scripts) or optional deps
-    # (--omit=optional), leaving `claude` launchable but failing with
-    # "native binary not installed" at runtime. Running install.cjs
-    # explicitly is idempotent and fixes both cases. Newer versions ship
-    # install.cjs inside the package; if absent (older version), verify
-    # runtime works and warn.
-    # pnpm ≥11 nests global packages under a content-hashed dir; query
-    # `pnpm list -g --parseable` instead of joining onto `pnpm root -g`.
-    echo "📦 claude native binary..."
-    CLAUDE_PKG="$(pnpm list -g --parseable 2>/dev/null | grep '/@anthropic-ai/claude-code$' | head -1)"
-    if [[ -n "$CLAUDE_PKG" && -f "$CLAUDE_PKG/install.cjs" ]]; then
-      node "$CLAUDE_PKG/install.cjs" || echo "  ⚠ claude install.cjs failed — run manually: node $CLAUDE_PKG/install.cjs"
-    elif ! claude --version >/dev/null 2>&1; then
-      echo "  ⚠ claude binary not runnable and no install.cjs present."
-      echo "    Try: pnpm install -g --force @anthropic-ai/claude-code"
-    fi
-
-    echo "📦 tmux plugins..."
-    "$HOME/.tmux/plugins/tpm/bin/install_plugins"
-
-    echo "🧹 cleanup..."
-    [[ -d "$HOME/.oh-my-zsh" ]] && rm -rf "$HOME/.oh-my-zsh" && echo "  removed ~/.oh-my-zsh"
-    dpkg -l bat &>/dev/null && sudo apt-get remove -y -qq bat && echo "  removed apt bat"
-
     echo "✅ Done"
 
 # Show installed tool versions
