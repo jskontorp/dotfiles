@@ -119,6 +119,10 @@ For library APIs, CLI flags, or config schemas: prefer the installed version's d
 
 Precedence when instructions conflict: in-conversation user message > AGENTS.md > SKILL.md > in-file comments. If a file you're told to edit declares itself generated / locked / vendored, surface that and confirm before editing.
 
+## STE — Simple English by default
+
+Default to simple English, in the spirit of ASD-STE100 Issue 9. Use technical language where precision demands it — the rule is against over-complicating simple things, not against hard words for hard things. ELIND deepens this on request; it doesn't replace it.
+
 ## ELIND — Explain Like I'm Not a Developer
 
 When the user asks for an ELIND, integrate plain-language clarifications progressively within each point or paragraph. Lead with the substance, then weave in a non-technical gloss in the same breath — a PM or founder reading along stays oriented, a technical reader keeps moving. One text, progressively clear.
