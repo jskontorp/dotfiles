@@ -1,3 +1,7 @@
+
+# Kiro CLI pre block. Keep at the top of this file.
+[[ -f "${HOME}/Library/Application Support/kiro-cli/shell/zshrc.pre.zsh" ]] && builtin source "${HOME}/Library/Application Support/kiro-cli/shell/zshrc.pre.zsh"
+
 # --- Early local overrides (not tracked, runs before everything) ---
 [[ -f ~/.zshrc.pre.local ]] && source ~/.zshrc.pre.local
 
@@ -80,3 +84,7 @@ if (( ${+functions[_kiro_cli_autosuggest_start]} )); then
     unfunction "$w" 2>/dev/null
   done
 fi
+
+
+# Kiro CLI post block. Keep at the bottom of this file.
+[[ -f "${HOME}/Library/Application Support/kiro-cli/shell/zshrc.post.zsh" ]] && builtin source "${HOME}/Library/Application Support/kiro-cli/shell/zshrc.post.zsh"
