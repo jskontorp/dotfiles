@@ -43,6 +43,20 @@ export function __resetPromptMutexForTest(): void {
 	promptMutex = Promise.resolve();
 }
 
+// Public entry for gates that prompt outside this module's confirmWrite
+// (e.g. untracked-brew.ts): serialise their interactive portion through
+// the same modal-slot mutex so concurrent gated tool calls queue instead
+// of dropping (JSK-57 class). Released in finally so a throwing prompt
+// cannot stall the queue.
+export async function withPromptLock<T>(fn: () => Promise<T>): Promise<T> {
+	const release = await acquirePromptLock();
+	try {
+		return await fn();
+	} finally {
+		release();
+	}
+}
+
 type UiCtx = {
 	hasUI: boolean;
 	ui: {

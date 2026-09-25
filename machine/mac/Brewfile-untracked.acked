@@ -1,0 +1,4 @@
+# Untracked brew installs — deliberately NOT in the Brewfile.
+# Consumed by machine/mac/brew-untracked.sh (sweep) and
+# pi/agent/extensions/untracked-brew.ts (install-time gate skips acked names).
+# Format: one name per line, optionally "name: why".

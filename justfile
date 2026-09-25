@@ -564,6 +564,11 @@ skills:
     print()
     print(f"({len(entries)} skills tracked by dotfiles. Pi sessions also load skills shipped by installed pi packages, e.g. setup-oauth + workspace-explorer from @feniix/pi-notion.)")
 
+# Review-time sweep for ad-hoc Homebrew installs (companion to the untracked-brew gate extension).
+[macos]
+brew-untracked:
+	bash {{MAC}}/brew-untracked.sh
+
 # Sub-second; safe to run before every commit (wired into git/hooks/pre-commit).
 # For the full Docker integration suite, use `just test`.
 #
@@ -605,6 +610,14 @@ check:
       printf "  ⚠ node not on PATH — skipped\n" >&2
     else
       ( cd {{DOTFILES}} && node --test pi/agent/extensions/shared/*.test.mjs >/dev/null ) && printf "  ✅ unit tests pass\n"
+    fi
+    printf "\nuntracked-brew gate:\n"
+    if ! command -v node >/dev/null 2>&1; then
+      printf "  ⚠ node not on PATH — skipped\n" >&2
+    else
+      ( cd {{DOTFILES}} && node --test test/check-untracked-brew.mjs >/dev/null 2>&1 ) \
+        && printf "  ✅ gate cases pass\n" \
+        || { printf "  ❌ untracked-brew gate cases failed\n" >&2; exit 1; }
     fi
     printf "\nBrewfile (mac):\n"
     if [[ "$(uname -s)" == "Darwin" ]]; then
