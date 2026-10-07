@@ -97,3 +97,47 @@ __osc7_cwd() {
 # Register once — guard prevents double-registration on re-source
 (( ${chpwd_functions[(Ie)__osc7_cwd]} )) || add-zsh-hook chpwd __osc7_cwd
 __osc7_cwd  # emit once at shell startup
+
+# --- per-repo GitHub account pinning ---
+# Pin a clone's git credential identity AND gh CLI calls to one gh account.
+# `gh-pin <account>` once per clone writes three local config entries:
+#   - helper = ""                (reset the global gh credential helper chain)
+#   - helper = inline resolver   (looks up the keyring token for the requested
+#                                username — plain `gh auth git-credential`
+#                                ignores the requested username and returns
+#                                the active account, so an inline shim is
+#                                needed; it also hard-errors on a username
+#                                mismatch, which is why helper+username must
+#                                always be set together)
+#   - username = <account>       (what git passes to the helper; also what the
+#                                `gh()` wrapper below keys off)
+# Remove with: git config --unset-all credential.https://github.com.helper;
+#              git config --unset credential.https://github.com.username
+gh-pin() {
+  local acct=${1:-}
+  [[ -n $acct ]] || { print -u2 "usage: gh-pin <gh-account>"; return 2; }
+  git rev-parse --git-dir >/dev/null 2>&1 \
+    || { print -u2 "gh-pin: not a git repo (run inside the clone)"; return 1; }
+  git config credential.https://github.com.helper ''
+  git config credential.https://github.com.helper \
+    '!f() { u=$(sed -n "s/^username=//p"); t=$(gh auth token -u "$u") && printf "username=%s\npassword=%s\n" "$u" "$t"; }; f'
+  git config credential.https://github.com.username "$acct"
+}
+
+# --- gh wrapper: respect per-repo credential identity ---
+# Repos pinned via local config (git config credential.https://github.com.username
+# <account>) get their gh calls run as that account too: run gh with GH_TOKEN
+# from the keyring for the pinned account. Falls through to plain gh when the
+# cwd is not a git repo or carries no pinned username.
+gh() {
+  local pinned_user token
+  if pinned_user="$(git config --get credential.https://github.com.username 2>/dev/null)" \
+    && [[ -n $pinned_user ]]; then
+    if token="$(command gh auth token -u "$pinned_user" 2>/dev/null)" && [[ -n $token ]]; then
+      GH_TOKEN="$token" command gh "$@"
+      return
+    fi
+    print -u2 "gh: pinned account '$pinned_user' unavailable, falling back"
+  fi
+  command gh "$@"
+}
