@@ -55,6 +55,7 @@ cd ~/code/personal/dotfiles_worktrees/<slug>
 
 ## Known regression classes
 
+- **Token-injecting CLI wrappers block auth management.** The `gh()` wrapper must pass `gh auth ...` straight through; injecting `GH_TOKEN` there blocks account switching even after `unset GH_TOKEN`. Evidence: c9e753b. Detection: `test/gh-auth-check.zsh` under `just test`. Closure: auth bypass added; normal repo pinning preserved.
 - **`set -e` + missing optional tool.** `install.sh` runs under `set -euo pipefail`. New external commands (`bat`, `python3`, …) need a `command -v` guard or must be added to `test/Dockerfile.{mac,vm}`. Evidence: cfc4ba1, 070d150.
 - **Skill scope migration leaves orphan symlinks.** When a skill moves between `global` and `project:<name>` scope, prior-scope symlinks must be cleaned up explicitly. `just test` (idempotency check) is the only catch. Evidence: 1d4069d, 356dcc5, 179b206.
 - **Project decommission leaves orphan symlinks.** Removing a project from `projects.conf` / deleting `projects/<name>/` strands every symlink `install.sh` previously created under that project's working tree (and any `~/.pi/agent/extensions/<x>` / `<x>.ts` left from a global → project move — see 0f38b0c, file moves into `extensions/graveyard/`). `install.sh` only links forward; `uninstall.sh` is manifest-driven and these never entered the manifest. `validate-manifest.sh` now buckets them as `ORPHAN` (target missing) distinct from `UNTRACKED` (target exists, real install.sh bug). Remediation: `rm` the symlinks. Evidence: 6afb180, 0f38b0c.

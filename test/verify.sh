@@ -176,6 +176,8 @@ run_test() {
   check "git fn: gdc"                      'dexec zsh -i -c "whence -w gdc | grep -q function"'
   check "git fn: gae"                      'dexec zsh -i -c "whence -w gae | grep -q function"'
   check "git fn: gcof"                     'dexec zsh -i -c "whence -w gcof | grep -q function"'
+  check "gh: auth commands bypass repo pinning" \
+    'dexec zsh -f /home/testuser/dotfiles/test/gh-auth-check.zsh'
 
   # --- Re-source safety ---
   printf "\nRe-source safety:\n"

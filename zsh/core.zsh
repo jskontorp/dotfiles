@@ -128,8 +128,13 @@ gh-pin() {
 # Repos pinned via local config (git config credential.https://github.com.username
 # <account>) get their gh calls run as that account too: run gh with GH_TOKEN
 # from the keyring for the pinned account. Falls through to plain gh when the
-# cwd is not a git repo or carries no pinned username.
+# cwd is not a git repo or carries no pinned username. Auth commands bypass
+# pinning so gh can manage accounts without an injected GH_TOKEN overriding it.
 gh() {
+  if [[ ${1:-} == auth ]]; then
+    command gh "$@"
+    return
+  fi
   local pinned_user token
   if pinned_user="$(git config --get credential.https://github.com.username 2>/dev/null)" \
     && [[ -n $pinned_user ]]; then
