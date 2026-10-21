@@ -23,6 +23,7 @@
 // gating them here would create false positives on routine reads.
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { withPromptLock } from "./shared/gate.ts";
 
 type Pattern = {
 	id: string;
@@ -165,9 +166,11 @@ export default function (pi: ExtensionAPI) {
 
 		// Interactive: prompt with the verbatim command. "No" is first so the
 		// default focus blocks; the user must deliberately pick "Yes" to allow.
-		const choice = await ctx.ui.select(
-			`⚠️  Destructive command (${matched.id})\n\n  ${command}\n\nAllow this command to run?`,
-			["No", "Yes"],
+		const choice = await withPromptLock(() =>
+			ctx.ui.select(
+				`⚠️  Destructive command (${matched.id})\n\n  ${command}\n\nAllow this command to run?`,
+				["No", "Yes"],
+			),
 		);
 
 		if (choice !== "Yes") {

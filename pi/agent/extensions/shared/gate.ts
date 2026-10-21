@@ -1,60 +1,28 @@
-// Write-action confirm gate, shared between linear.ts and notion.ts.
-//
-// Flow (mirrors the previous linear-routing.ts behaviour):
-//   1. Render markdown preview via renderPreview().
-//   2. ctx.ui.select with [<action label>, "revise", "cancel"].
-//   3. action label → allow; revise → prompt for feedback, return block with
-//      that feedback embedded in the reason; cancel → return block.
-//   4. Headless (!ctx.hasUI) → return block immediately with a clear reason.
-//
-// Concurrency: pi's TUI exposes a single modal slot for `ctx.ui.select` /
-// `ctx.ui.input`. When the agent dispatches multiple gated tool calls in one
-// turn (a common pattern for bulk triage), concurrent prompts collide — the
-// last call's modal wins, prior calls' promises never resolve, and the model
-// sees `No result provided` for all but one. JSK-57.
-//
-// Fix: a module-level async mutex (`promptMutex`) serialises the interactive
-// portion across all gated callers in the process — both linear and notion
-// share this gate, so the mutex is shared too. The non-interactive headless
-// branch and the preview render run outside the lock; only `ctx.ui.select`
-// (+ optional `ctx.ui.input`) hold it. Prompts then appear one-at-a-time in
-// dispatch order.
-
+// Pi has one modal slot. Keep its queue process-wide: jiti's moduleCache:false
+// can load separate copies of this helper for different extensions (JSK-57).
 import { renderPreview } from "./preview.ts";
 
-// Async mutex: each acquire() returns a release fn; calls queue on a single
-// promise chain so prompts run strictly serially in dispatch order. Released
-// in a `finally` so a throwing prompt cannot stall the queue.
-let promptMutex: Promise<void> = Promise.resolve();
-async function acquirePromptLock(): Promise<() => void> {
-	let release!: () => void;
-	const next = new Promise<void>((r) => {
-		release = r;
-	});
-	const prev = promptMutex;
-	promptMutex = prev.then(() => next);
-	await prev;
-	return release;
+declare global {
+	var __dotfilesPiPromptMutex: Promise<void> | undefined;
 }
 
-// Test-only hook: reset the mutex between tests. Not exported through any
-// public surface; the .test.mjs imports it by name.
-export function __resetPromptMutexForTest(): void {
-	promptMutex = Promise.resolve();
-}
-
-// Public entry for gates that prompt outside this module's confirmWrite
-// (e.g. untracked-brew.ts): serialise their interactive portion through
-// the same modal-slot mutex so concurrent gated tool calls queue instead
-// of dropping (JSK-57 class). Released in finally so a throwing prompt
-// cannot stall the queue.
 export async function withPromptLock<T>(fn: () => Promise<T>): Promise<T> {
-	const release = await acquirePromptLock();
+	let release!: () => void;
+	const next = new Promise<void>((resolve) => {
+		release = resolve;
+	});
+	const previous = globalThis.__dotfilesPiPromptMutex ?? Promise.resolve();
+	globalThis.__dotfilesPiPromptMutex = previous.then(() => next);
+	await previous;
 	try {
 		return await fn();
 	} finally {
 		release();
 	}
+}
+
+export function __resetPromptMutexForTest(): void {
+	globalThis.__dotfilesPiPromptMutex = Promise.resolve();
 }
 
 type UiCtx = {
@@ -88,8 +56,7 @@ export async function confirmWrite(
 
 	const preview = renderPreview(toolName, action, input, { workspaceLabel, skipFields });
 
-	const release = await acquirePromptLock();
-	try {
+	return withPromptLock<GateResult>(async () => {
 		const choice = await ctx.ui.select(
 			`${toolName} ${action} — review before executing\n\n${preview}`,
 			[action, "revise", "cancel"],
@@ -120,7 +87,5 @@ export async function confirmWrite(
 			};
 		}
 		return { allow: true };
-	} finally {
-		release();
-	}
+	});
 }

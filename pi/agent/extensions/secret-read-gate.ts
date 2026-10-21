@@ -24,6 +24,7 @@
 //     of a secret path hard-blocks.
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { withPromptLock } from "./shared/gate.ts";
 
 // Patterns mirror SECRET_GATE_PATTERNS in git/lib/secret-gate.sh. Each entry
 // is { id, re } where `id` shows up in the prompt and `re` matches the path.
@@ -115,10 +116,8 @@ export default function (pi: ExtensionAPI) {
 			};
 		}
 
-		const choice = await ctx.ui.select(
-			`🔐  Secret-path read (${matched.id})\n\n  ${subject}\n\nAllow this read?`,
-			["No", "Yes"],
-		);
+		const title = `🔐  Secret-path read (${matched.id})\n\n  ${subject}\n\nAllow this read?`;
+		const choice = await withPromptLock(() => ctx.ui.select(title, ["No", "Yes"]));
 
 		if (choice !== "Yes") {
 			return {

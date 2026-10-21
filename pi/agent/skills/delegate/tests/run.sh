@@ -8,10 +8,10 @@ rc=0
 failures=()
 for t in "$HERE"/*.test.sh; do
   [ -x "$t" ] || continue
-  if ! "$t"; then
+  "$t" || {
     rc=$?
     failures+=("$(basename "$t")")
-  fi
+  }
 done
 
 echo ""

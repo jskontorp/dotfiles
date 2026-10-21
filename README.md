@@ -37,7 +37,14 @@ just update    # upgrade packages + install new additions (hits network)
 | `just link` | Re-symlink all configs |
 | `just status` | Show installed tool versions |
 | `just check` | Fast host-side checks (justfile parity, manifest integrity, bash portability); wired into pre-commit |
-| `just test` | Run Docker validation |
+| `just test` | Run Docker installation validation (macOS shim + Linux; does not run Pi) |
+| `just test-skills` | Run all skill script suites |
+| `just test-pi` | Offline compatibility tests against the installed Pi SDK (requires pnpm, or `PI_TEST_PACKAGE_DIR`) |
+| `just doctor` | Check live links, tool versions, plugins, and workspace routing |
+
+After upgrading Pi, run `just check`, `just test-skills`, `just test-pi`, and `just test both`. Runtime tests use scripted responses and fake tools to check extension loading, direct/nested safety gates, confirmation queues, reload, model changes, compaction, and resume—without model/API calls. Terminal behavior and Oracle still need manual checks.
+
+Keep Pi managed by pnpm (`just update`). Link only from canonical, review the tracked model defaults (linking overwrites them), and restart Pi after updates. Codemode stays opt-in; try `pi --tools read,grep,find,ls,codemode --no-mcp` for a local-read pilot.
 
 **Edit configs:**
 
