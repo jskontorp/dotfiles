@@ -144,8 +144,7 @@ Recognised fields (both agents ignore unknown keys, so it is safe to set agent-s
 - `name`, `description`, `allowed-tools` — standard. Same format for pi and Claude Code.
 - `compatibility` — free-form note about runtime requirements (docker, tmux, pi, etc.). Informational only.
 - `claude-compatible: false` — opt the skill out of mirroring to `~/.claude/skills/`. Set on skills that depend on pi's runtime (`Bash(pi:*)`), pi extensions (`.ts` files under `pi/agent/extensions/`), or pi-only tool names (e.g. raw `linear`, `notion`). `install.sh` skips these during the Claude mirror step.
-- `disable-model-invocation: true` *(claude only)* — Claude won't auto-pick the skill on description match; it must be triggered explicitly via slash-command (e.g. `/commit`). Set on side-effect skills where a false-positive description match would cause real damage — unwanted commit, push, history rewrite, container spin-up.
-- **Pi-side auto-invocation gating** *(pi only)* — pi ignores `disable-model-invocation` and dispatches by description as usual. To gate a skill on pi, narrow its description to a verbatim trigger phrase the user must say (the looser the description, the more surface for hook-injected text to fire it).
+- `disable-model-invocation: true` — both agents hide the skill from automatic model selection while keeping explicit skill commands available (Pi: `/skill:name`; Claude: `/name`). Set on side-effect skills where a false-positive description match could cause unwanted commits, pushes, history rewrites, or container startup. This controls discovery, not tool permissions; execution still follows the approval rules above.
 
 # Where pi skills and extensions live (pi only)
 

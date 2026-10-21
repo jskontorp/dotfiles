@@ -603,13 +603,15 @@ check:
     if ! command -v tsc >/dev/null 2>&1; then
       printf "  ⚠ tsc not on PATH — skipped (run 'just update' to install)\n" >&2
     else
-      ( cd {{DOTFILES}}/pi/agent/extensions && tsc --noEmit ) && printf "  ✅ no type errors\n"
+      ( cd {{DOTFILES}}/pi/agent/extensions && tsc --noEmit )
+      printf "  ✅ no type errors\n"
     fi
     printf "\nextensions (node unit tests):\n"
     if ! command -v node >/dev/null 2>&1; then
       printf "  ⚠ node not on PATH — skipped\n" >&2
     else
-      ( cd {{DOTFILES}} && node --test pi/agent/extensions/shared/*.test.mjs >/dev/null ) && printf "  ✅ unit tests pass\n"
+      ( cd {{DOTFILES}} && node --test pi/agent/extensions/shared/*.test.mjs test/check-failure-propagation.mjs )
+      printf "  ✅ unit tests pass\n"
     fi
     printf "\nuntracked-brew gate:\n"
     if ! command -v node >/dev/null 2>&1; then
@@ -635,12 +637,11 @@ check:
     fi
 
 # Checks an agentic session's runtime: tool versions on PATH, $DOTFILES env
-# matches this checkout, manifest symlinks intact, Claude plugins materialised
-# against settings.json's enabledPlugins, and the notion-routing cwd→auth-file
-# mapping behaves. No network calls; no keychain probing (those surface
-# naturally when used). Exit non-zero on any failure.
+# matches canonical, manifest symlinks intact, Claude plugins materialised,
+# and the shared Linear/Notion workspace routing behaves. No network calls
+# or credential reads. Exit non-zero on any failure.
 #
-# Probe runtime: tool PATH, $DOTFILES, symlinks, claude plugins, notion routing.
+# Probe runtime: tool PATH, $DOTFILES, symlinks, plugins, workspace routing.
 [group('test')]
 doctor:
     #!/usr/bin/env bash
@@ -661,10 +662,11 @@ doctor:
     done
 
     printf "\n\$DOTFILES env:\n"
+    canonical="$(dirname "$(git -C {{DOTFILES}} rev-parse --path-format=absolute --git-common-dir)")"
     if [[ -z "${DOTFILES:-}" ]]; then
       warn "\$DOTFILES not exported in this shell (zsh/core.zsh sets it; ok if you're in a non-zsh shell)"
-    elif [[ "$DOTFILES" != "{{DOTFILES}}" ]]; then
-      fail "\$DOTFILES=$DOTFILES but justfile_directory() is {{DOTFILES}} (moved checkout? re-source ~/.zshrc)"
+    elif [[ "$DOTFILES" != "$canonical" ]]; then
+      fail "\$DOTFILES=$DOTFILES but canonical is $canonical (moved checkout? re-source ~/.zshrc)"
     else
       ok "\$DOTFILES=$DOTFILES"
     fi
@@ -698,37 +700,27 @@ doctor:
       done < <(jq -r '.enabledPlugins | to_entries[] | select(.value) | .key' "$settings")
     fi
 
-    printf "\nnotion routing (cwd → auth file):\n"
-    if ! command -v zsh >/dev/null 2>&1; then
-      warn "zsh not on PATH — skipping (routing source is zsh-only)"
+    printf "\nworkspace routing (Linear + Notion):\n"
+    if node --test {{DOTFILES}}/pi/agent/extensions/shared/workspace.test.mjs; then
+      ok "shared cwd → workspace routing"
     else
-      check_route() {
-        local cwd="$1" expected="$2"
-        local got
-        got=$(zsh -c "source {{DOTFILES}}/zsh/pi-notion-routing.zsh && _pi_notion_auth_file '$cwd'" 2>/dev/null)
-        local exp_label="${expected##*/}"
-        [[ -z "$expected" ]] && exp_label="(unset)"
-        local got_label="${got##*/}"
-        [[ -z "$got" ]] && got_label="(unset)"
-        if [[ "$got" == "$expected" ]]; then
-          ok "$cwd → $exp_label"
-        else
-          fail "$cwd → got $got_label, expected $exp_label"
-        fi
-      }
-      check_route "$HOME/code/personal/foo"         "$HOME/.pi/agent/notion-mcp-auth-personal.json"
-      check_route "$HOME/code/work/volve-ai"        "$HOME/.pi/agent/notion-mcp-auth-volve.json"
-      check_route "$HOME/code/personal/volve-notes" "$HOME/.pi/agent/notion-mcp-auth-personal.json"
-      check_route "$HOME/tmp/random"                ""
+      fail "shared workspace routing tests failed"
     fi
 
-    printf "\nlinear routing extension:\n"
-    ext="$HOME/.pi/agent/extensions/linear-routing.ts"
-    if [[ -L "$ext" && -e "$ext" ]]; then
-      target=$(readlink "$ext")
-      ok "linear-routing.ts → ${target#$HOME/}"
+    printf "\nworkspace extensions:\n"
+    for name in linear notion; do
+      ext="$HOME/.pi/agent/extensions/$name.ts"
+      if [[ -L "$ext" && -e "$ext" ]]; then
+        target=$(readlink "$ext")
+        ok "$name.ts → ${target#$HOME/}"
+      else
+        fail "$ext missing or broken (run 'just link' from canonical)"
+      fi
+    done
+    if [[ -L "$HOME/.pi/agent/extensions/shared" && -f "$HOME/.pi/agent/extensions/shared/workspace.ts" ]]; then
+      ok "shared workspace module linked"
     else
-      fail "$ext missing or broken (run 'just link')"
+      fail "shared workspace module missing or broken"
     fi
 
     printf "\n"
@@ -738,6 +730,11 @@ doctor:
       printf "❌ doctor: issues found above\n" >&2
     fi
     exit $rc
+
+# Offline compatibility checks against the installed Pi SDK; no model/API calls.
+[group('test')]
+test-pi:
+    node --test {{DOTFILES}}/test/check-pi-runtime.mjs
 
 # For fast skill unit tests, use `just test-skills` / `just test-skill <name>`.
 #

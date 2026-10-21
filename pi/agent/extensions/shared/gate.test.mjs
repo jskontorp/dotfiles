@@ -58,6 +58,19 @@ test("concurrent confirmWrite calls run strictly serially", async () => {
 	}
 });
 
+test("separate module instances share the process-wide prompt lock", async () => {
+	__resetPromptMutexForTest();
+	const duplicate = await import("./gate.ts?separate-extension");
+	const recorder = { events: [], overlap: false };
+	const ctx = makeCtx({ selectAnswer: "create_issue", recorder });
+	const results = await Promise.all([
+		confirmWrite(ctx, "linear", "create_issue", {}, "Personal"),
+		duplicate.confirmWrite(ctx, "notion", "create_issue", {}, "Personal"),
+	]);
+	assert.equal(recorder.overlap, false, "independently loaded modules must serialize");
+	for (const result of results) assert.deepEqual(result, { allow: true });
+});
+
 test("cancellation in one call does not stall the queue", async () => {
 	__resetPromptMutexForTest();
 	const recorder = { events: [], overlap: false };

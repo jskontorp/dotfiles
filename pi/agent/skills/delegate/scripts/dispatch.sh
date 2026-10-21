@@ -157,12 +157,17 @@ if $USE_TUI; then
 else
   # Tee output so a `tmux attach -t pi-delegate` pane shows live progress
   # while still capturing everything to the result file. Use PIPESTATUS so
-  # pipefail doesn't mask the sub-agent's exit code with tee's, and `|| true`
-  # so a non-zero sub-agent exit doesn't trigger `set -e` before we record it.
+  # pipefail doesn't mask the sub-agent's exit code with tee's. Capture it
+  # inside the failure branch before another command overwrites PIPESTATUS.
   # (Sequential fallback callers should redirect dispatch.sh's stdout to avoid
   # interleaving multiple sub-agents into the orchestrator's terminal.)
-  "${TIMEOUT_CMD[@]}" "${PI_CMD[@]}" 2>&1 | tee -a "$RESULT_FILE" || true
-  EXIT_CODE=${PIPESTATUS[0]}
+  if "${TIMEOUT_CMD[@]}" "${PI_CMD[@]}" 2>&1 | tee -a "$RESULT_FILE"; then
+    EXIT_CODE=0
+  else
+    PIPE_EXITS=("${PIPESTATUS[@]}")
+    EXIT_CODE=${PIPE_EXITS[0]}
+    [ "$EXIT_CODE" -ne 0 ] || EXIT_CODE=${PIPE_EXITS[1]}
+  fi
 fi
 
 # Record exit code

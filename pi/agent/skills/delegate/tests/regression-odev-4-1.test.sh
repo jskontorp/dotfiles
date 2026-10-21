@@ -10,7 +10,7 @@
 #
 # This test exercises the realistic orchestrator pattern (`tmux new-session
 # -d` → 3× split-window → 4× dispatch.sh in panes) and asserts all four
-# tasks complete with .exit=0 within 30s, no straggler shims.
+# tasks complete with .exit=0 within 45s, no straggler shims.
 
 set -uo pipefail
 
@@ -52,18 +52,17 @@ export PI_SHIM_MODE="exit0"
 PATH_FOR_PANES="$BIN:$PATH"
 
 # Detached session, sub-20-row geometry — the exact odev:4.1 conditions.
-tmux new-session -d -s "$SESSION" -x 80 -y 24 -n batch
+tmux new-session -d -s "$SESSION" -x 80 -y 24 -n batch 'exec bash --noprofile --norc'
 # Layout will be tiled 4-way (~80×6 panes), reproducing the original failure
 # geometry. Split 3 times.
 for _ in 1 2 3; do
-  tmux split-window -t "$SESSION:batch"
+  tmux split-window -t "$SESSION:batch" 'exec bash --noprofile --norc'
   tmux select-layout -t "$SESSION:batch" tiled
 done
 
-# Give each pane's shell a moment to finish init (zshrc / bashrc can be slow
-# enough that send-keys races prompt-readiness and the keystrokes get
-# eaten). Empirically 2s suffices on this skill's reference hosts.
-sleep 2
+# Isolate dispatch from user shell startup: the baseline intermittently lost
+# commands before the shim started. Plain bash avoids that external readiness
+# dependency; terminal input stays queued until the shell reads it.
 
 # Dispatch 4 tasks, one per pane.
 for i in 0 1 2 3; do

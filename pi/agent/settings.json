@@ -1,4 +1,6 @@
 {
+  "$schema": "https://pi.dev/schemas/settings.schema.json",
+  "tuiMode": "regular",
   "defaultProvider": "github-copilot",
   "defaultModel": "claude-opus-4.8",
   "defaultThinkingLevel": "medium",
