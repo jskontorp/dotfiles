@@ -1,4 +1,5 @@
 # batch: pi-1-2-compat
+closed: 2026-10-21
 
 ## Standing Directives
 
@@ -9,6 +10,8 @@
 - Linear filing proposed for post-landing; no answer yet, no Linear writes.
 - User approved expanding the batch to diagnose/repair the pre-existing delegate regression and its masking test runner, without weakening assertions.
 - Latest directive: polish and simplify, preserving functionality, then commit. Commit is now approved; merge, push, relink, and external writes remain unapproved.
+- User approved merging into canonical main while preserving shared/gitconfig; no push or relink. Cleanup commands still require explicit per-call approval.
+- User approved proceeding with the landing-record commit; remove the clean merged worktree and branch only with per-call confirmation.
 
 ## Verification invariants
 
@@ -34,4 +37,5 @@
 - Final verification passed: just check (including 16 Node tests); direct tsc --noEmit; direct shared Node tests (11/11); just test-skills (all delegate and session-scan suites; original tmux regression 10/10); just test both (143/143); just test-pi (7/7, installed SDK 1.2.0); just doctor; git diff --check. Runtime sandbox isolates HOME, shadows keychain lookup with a refusing fixture, and asserts zero lookup attempts and zero network attempts. No surviving test processes, delegate-test sessions, or Docker containers observed.
 - Final diff review complete. Updated AGENTS.md's existing modal regression entry with the independent-module-instance finding and added the runtime test to upgrade/gate-change verification guidance. Proposed additional regression entry for landing approval: shell status masking (Evidence: 0d891ab, 1115932; detection: test/check-failure-propagation.mjs; fixed in this worktree, not landed).
 - Deferred by first-batch scope: model selection, global codemode, MCP migration, watcher/archaeology redesign, real interactive terminal and Oracle checks, and validation of the original long-lived-process failure over comparable elapsed time. No new dependencies. No commit, merge, relink, or external writes performed. Worktree retained for user review/landing approval; ledger remains open until landing.
+- Landed as merge d6dd4f8 on main (implementation 0a707f7). Post-merge just check, just doctor, just test-skills, just test both (145/145), just test-pi (7/7), direct tsc and Node tests (16/16) passed. git diff --check reports only pre-existing trailing whitespace in shared/gitconfig at lines 23/33; its fingerprint is unchanged (87fcb7b9cfb6cc176f4c3190a6b15ceb3edafbca). Closure-record commit approved; clean worktree/branch removal awaits per-call confirmation. Existing shared/gitconfig edits stay unstaged; no push or relink.
 - Polish phase complete: reviewed all 16 changed/untracked files; no foreign worktree edits found. Consolidated confirmation locking through withPromptLock, removed the delegate runner's no-op branch, used the documented nested-call shape, made interactive test cleanup single-path, shortened docs, and recorded the shell-status regression. Post-polish verification passed: just check; just doctor; just test-skills (both suites); just test both (143/143); just test-pi (7/7); direct tsc; direct shared/failure Node tests (16/16); git diff --check. No new dependencies or weakened safety assertions. Approved commit prepared: `Harden Pi 1.2 compatibility and failure reporting`. Ledger remains open because branch integration/landing is not approved; no merge, push, or relink.
